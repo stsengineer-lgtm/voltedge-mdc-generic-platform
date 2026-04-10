@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VoltEdge MDC — AI Decision-Support Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy:   #0f2a4a;
+    --navy2:  #1a3d5c;
+    --teal:   #00a878;
+    --teal2:  #007a58;
+    --amber:  #f0a500;
+    --red:    #e74c3c;
+    --bg:     #f0f4f9;
+    --card:   #ffffff;
+    --border: #d8e3ee;
+    --text:   #1a2e44;
+    --muted:  #6b82a0;
+    --sidebar-w: 240px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+  /* ── LAYOUT ── */
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #sidebar { width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; flex-shrink: 0; }
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 28px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  #content { flex: 1; overflow-y: auto; padding: 28px; }
+
+  /* ── SIDEBAR ── */
+  .sb-logo { padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sb-logo-name { color: #fff; font-size: 16px; font-weight: 700; letter-spacing: .5px; }
+  .sb-logo-sub  { color: rgba(255,255,255,0.45); font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+  .sb-section { padding: 14px 12px 4px; color: rgba(255,255,255,0.3); font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; }
+  .sb-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; border-radius: 6px; margin: 2px 8px; color: rgba(255,255,255,0.65); font-size: 13px; transition: all .15s; }
+  .sb-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .sb-item.active { background: var(--teal); color: #fff; }
+  .sb-icon { font-size: 15px; width: 18px; text-align: center; }
+  .sb-badge { margin-left: auto; background: var(--amber); color: #fff; border-radius: 10px; font-size: 10px; padding: 1px 7px; font-weight: 700; }
+  .sb-footer { margin-top: auto; padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .sb-user { display: flex; align-items: center; gap: 10px; }
+  .sb-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--teal); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; }
+  .sb-user-info { color: rgba(255,255,255,0.8); font-size: 12px; }
+  .sb-user-role { color: rgba(255,255,255,0.4); font-size: 11px; }
+
+  /* ── TOPBAR ── */
+  .tb-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .tb-right { display: flex; align-items: center; gap: 14px; }
+  .tb-badge { background: #eaf7f3; color: var(--teal2); border: 1px solid #b2e5d5; border-radius: 20px; padding: 4px 12px; font-size: 11px; font-weight: 600; }
+  .tb-badge.warn { background: #fff8e6; color: #b37800; border-color: #ffe099; }
+  .tb-icon-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; position: relative; }
+  .tb-notif { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; background: var(--red); border-radius: 50%; border: 2px solid #fff; }
+
+  /* ── VIEWS ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ── CARDS ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px; }
+
+  /* ── KPI GRID ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; color: var(--text); margin: 6px 0 4px; }
+  .kpi-delta { font-size: 12px; }
+  .kpi-delta.up { color: var(--teal); }
+  .kpi-delta.down { color: var(--red); }
+  .kpi-delta.neutral { color: var(--muted); }
+  .kpi-icon { float: right; font-size: 28px; opacity: .15; margin-top: -4px; }
+
+  /* ── GRID LAYOUTS ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-65 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  .grid-56 { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+  .mt16 { margin-top: 16px; }
+  .mt20 { margin-top: 20px; }
+  .mt24 { margin-top: 24px; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-size: 22px; font-weight: 700; color: var(--text); }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* ── TAGS / CHIPS ── */
+  .tag { display: inline-block; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+  .tag-green { background: #eaf7f3; color: var(--teal2); }
+  .tag-amber { background: #fff8e6; color: #b37800; }
+  .tag-red   { background: #fdecea; color: #c0392b; }
+  .tag-blue  { background: #e8f0fb; color: #2563ab; }
+  .tag-navy  { background: #e6edf5; color: var(--navy); }
+
+  /* ── BUTTONS ── */
+  .btn { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+  .btn-primary { background: var(--teal); color: #fff; }
+  .btn-primary:hover { background: var(--teal2); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg); }
+  .btn-amber { background: var(--amber); color: #fff; }
+  .btn-amber:hover { background: #d4920a; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); padding: 10px 12px; border-bottom: 2px solid var(--border); }
+  tbody td { padding: 11px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: #f8fafc; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ── PROGRESS / BARS ── */
+  .progress { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; border-radius: 4px; background: var(--teal); }
+  .progress-fill.amber { background: var(--amber); }
+  .progress-fill.red   { background: var(--red); }
+
+  /* ── ALERT BANNER ── */
+  .alert-banner { border-radius: 8px; padding: 12px 16px; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; font-size: 13px; }
+  .alert-banner.warn  { background: #fff8e6; border: 1px solid #ffe099; color: #7a5500; }
+  .alert-banner.info  { background: #e8f0fb; border: 1px solid #b8d0f5; color: #1d4e8a; }
+  .alert-banner.good  { background: #eaf7f3; border: 1px solid #b2e5d5; color: #0d5c3f; }
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── CHART WRAPPER ── */
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { max-height: 220px; }
+
+  /* ── DECISION CARD ── */
+  .decision-card { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; background: var(--card); margin-bottom: 14px; }
+  .decision-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .decision-title { font-size: 14px; font-weight: 600; }
+  .decision-body { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .decision-meta { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .decision-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .confidence-bar { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .conf-label { font-size: 11px; color: var(--muted); width: 90px; flex-shrink: 0; }
+  .conf-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .conf-fill { height: 100%; border-radius: 3px; }
+
+  /* ── SCENARIO TABLE ── */
+  .scenario-row { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .scenario-row-header { display: flex; align-items: center; padding: 12px 16px; background: #f8fafc; cursor: pointer; gap: 12px; }
+  .scenario-row-header:hover { background: #f0f4f9; }
+  .scenario-row-body { padding: 16px; display: none; border-top: 1px solid var(--border); }
+  .scenario-row-body.open { display: block; }
+  .scenario-name { font-weight: 600; font-size: 13px; flex: 1; }
+  .scenario-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .sm-box { text-align: center; }
+  .sm-val { font-size: 18px; font-weight: 700; }
+  .sm-lab { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── FIBER MAP ── */
+  .fiber-map { background: #1a2e44; border-radius: 8px; padding: 20px; min-height: 200px; position: relative; display: flex; align-items: center; justify-content: center; }
+  .fiber-label { color: rgba(255,255,255,0.4); font-size: 13px; }
+  .map-node { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; }
+  .map-node.site   { background: var(--teal); }
+  .map-node.hub    { background: var(--amber); }
+  .map-node.pop    { background: #6c8afd; }
+  .map-tooltip { position: absolute; background: rgba(0,0,0,0.85); color: #fff; font-size: 11px; padding: 6px 10px; border-radius: 5px; white-space: nowrap; pointer-events: none; display: none; z-index: 10; }
+  svg.fiber-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* ── DATA LAYER PILLS ── */
+  .layer-pill { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; margin-bottom: 8px; }
+  .layer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .layer-name { font-size: 13px; font-weight: 600; flex: 1; }
+  .layer-status { font-size: 11px; color: var(--muted); }
+  .layer-indicator { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ind-green { background: var(--teal); }
+  .ind-amber { background: var(--amber); }
+  .ind-grey  { background: var(--muted); }
+
+  /* ── RAG NARRATIVE ── */
+  .rag-box { background: #f0f4f9; border-left: 4px solid var(--teal); border-radius: 0 8px 8px 0; padding: 14px 16px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .rag-sources { margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .rag-cite { display: inline-block; background: #e8f0fb; color: #2563ab; border-radius: 3px; padding: 1px 6px; font-size: 10px; margin-right: 4px; }
+
+  /* ── HUMAN IN THE LOOP ── */
+  .hitl-banner { background: linear-gradient(135deg, #1a3d5c, #0f2a4a); border-radius: 10px; padding: 18px 20px; color: #fff; display: flex; align-items: center; gap: 16px; }
+  .hitl-icon { font-size: 28px; }
+  .hitl-text { flex: 1; }
+  .hitl-title { font-weight: 700; font-size: 14px; }
+  .hitl-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 3px; }
+  .hitl-btn { background: var(--amber); color: #fff; border: none; padding: 9px 18px; border-radius: 7px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
+
+  /* ── TIMELINE ── */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before { content: ''; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px; background: var(--border); }
+  .tl-item { position: relative; margin-bottom: 18px; }
+  .tl-dot { position: absolute; left: -24px; top: 3px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--card); }
+  .tl-dot.green { background: var(--teal); }
+  .tl-dot.amber { background: var(--amber); }
+  .tl-dot.grey  { background: var(--muted); }
+  .tl-dot.blue  { background: #6c8afd; }
+  .tl-title { font-size: 13px; font-weight: 600; }
+  .tl-body  { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  .tl-time  { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ── SLIDER ── */
+  .slider-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+  .slider-label { font-size: 12px; width: 160px; flex-shrink: 0; }
+  input[type=range] { flex: 1; accent-color: var(--teal); }
+  .slider-val { font-size: 12px; font-weight: 700; width: 60px; text-align: right; }
+
+  /* ── TOGGLE ── */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 20px; transition: .2s; }
+  .toggle-slider::before { content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .toggle input:checked + .toggle-slider { background: var(--teal); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+  /* ── MISC ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .text-sm { font-size: 12px; color: var(--muted); }
+  .text-bold { font-weight: 700; }
+  .flex-row { display: flex; align-items: center; gap: 10px; }
+  .ml-auto { margin-left: auto; }
+  .w100 { width: 100%; }
+  .inline-icon { vertical-align: middle; }
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+  .read-only-chip { background: #e6edf5; color: var(--navy); font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<div id="sidebar">
+  <div class="sb-logo">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:34px;height:34px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">⚡</div>
+      <div>
+        <div class="sb-logo-name">VoltEdge MDC</div>
+        <div class="sb-logo-sub">AI Platform · v1.2</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sb-section">Platform</div>
+  <div class="sb-item active" onclick="navigate('dashboard')"><span class="sb-icon">🏠</span> Dashboard</div>
+  <div class="sb-item" onclick="navigate('sitescreen')"><span class="sb-icon">📍</span> Site Screening</div>
+
+  <div class="sb-section">Intelligence Layers</div>
+  <div class="sb-item" onclick="navigate('curtailment')"><span class="sb-icon">⚡</span> Curtailment Intelligence</div>
+  <div class="sb-item" onclick="navigate('sizing')"><span class="sb-icon">🔋</span> Load &amp; Storage Sizing</div>
+  <div class="sb-item" onclick="navigate('grid')"><span class="sb-icon">🔌</span> Grid Interaction Modeling</div>
+  <div class="sb-item" onclick="navigate('network')"><span class="sb-icon">🌐</span> Network &amp; Fiber Feasibility</div>
+
+  <div class="sb-section">Decision Support</div>
+  <div class="sb-item" onclick="navigate('decisions')"><span class="sb-icon">🤖</span> Agentic Recommendations <span class="sb-badge">3</span></div>
+  <div class="sb-item" onclick="navigate('scenarios')"><span class="sb-icon">📊</span> Scenario Analysis</div>
+  <div class="sb-item" onclick="navigate('narrative')"><span class="sb-icon">📝</span> Executive Narratives</div>
+
+  <div class="sb-section">Performance &amp; Ops</div>
+  <div class="sb-item" onclick="navigate('performance')"><span class="sb-icon">📈</span> Performance &amp; Impact</div>
+  <div class="sb-item" onclick="navigate('monitoring')"><span class="sb-icon">🛡️</span> Deployment &amp; Monitoring</div>
+
+  <div class="sb-section">Configuration</div>
+  <div class="sb-item" onclick="navigate('data')"><span class="sb-icon">💾</span> Data Sources</div>
+
+  <div class="sb-footer">
+    <div class="sb-user">
+      <div class="sb-avatar">VE</div>
+      <div>
+        <div class="sb-user-info">Planning Team</div>
+        <div class="sb-user-role">VoltEdge MDC · Human-in-Loop</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div id="main">
+  <div id="topbar">
+    <div class="tb-title" id="tb-title">Platform Dashboard</div>
+    <div class="tb-right">
+      <div class="tb-badge">● Live Data — AESO Feed Active</div>
+      <div class="tb-badge warn">⚠ 3 Pending Reviews</div>
+      <div class="tb-icon-btn">🔔<div class="tb-notif"></div></div>
+      <div class="tb-icon-btn">⚙</div>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ══════════════ DASHBOARD ══════════════ -->
+    <div class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div class="page-title">Platform Dashboard</div>
+        <div class="page-sub">Early-stage planning overview · Alberta Grid · Updated 5 min ago</div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">⚡</div>
+          <div class="kpi-label">Curtailment Forecast (Next 24h)</div>
+          <div class="kpi-value">147 <span style="font-size:14px;font-weight:400;">MWh</span></div>
+          <div class="kpi-delta up">↑ 23% vs. 7-day avg · High-confidence window: 11:00–15:00</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🔋</div>
+          <div class="kpi-label">Battery Utilization (Modeled)</div>
+          <div class="kpi-value">78<span style="font-size:14px;font-weight:400;">%</span></div>
+          <div class="kpi-delta up">↑ +12pts · Optimal sizing confirmed at 40 MW / 160 MWh</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">📍</div>
+          <div class="kpi-label">Active Sites in Analysis</div>
+          <div class="kpi-value">6</div>
+          <div class="kpi-delta neutral">3 pre-FEED · 2 siting screen · 1 final review</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🤖</div>
+          <div class="kpi-label">AI Recommendations Pending</div>
+          <div class="kpi-value">3</div>
+          <div class="kpi-delta down">Requires human review before proceeding</div>
+        </div>
+      </div>
+
+      <div class="grid-65">
+        <div class="card">
+          <div class="card-title">Curtailment Occurrence Forecast — 7-Day Horizon</div>
+          <div class="chart-wrap"><canvas id="chart-curtailment-main"></canvas></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">Site Status Overview</div>
+            <table>
+              <thead><tr><th>Site</th><th>Stage</th><th>Score</th></tr></thead>
+              <tbody>
+                <tr><td><b>Pincher Creek W1</b></td><td><span class="tag tag-green">Pre-FEED</span></td><td>⭐ 87</td></tr>
+                <tr><td><b>Lethbridge S3</b></td><td><span class="tag tag-amber">Siting</span></td><td>⭐ 74</td></tr>
+                <tr><td><b>Vulcan Wind N2</b></td><td><span class="tag tag-navy">Screening</span></td><td>⭐ 61</td></tr>
+                <tr><td><b>Taber Solar E1</b></td><td><span class="tag tag-green">Pre-FEED</span></td><td>⭐ 82</td></tr>
+                <tr><td><b>Medicine Hat G2</b></td><td><span class="tag tag-blue">Final Review</span></td><td>⭐ 91</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="hitl-banner">
+            <div class="hitl-icon">👤</div>
+            <div class="hitl-text">
+              <div class="hitl-title">3 Decisions Awaiting Human Review</div>
+              <div class="hitl-sub">AI has flagged proposals requiring engineering or regulatory judgment before proceeding.</div>
+            </div>
+            <button class="hitl-btn" onclick="navigate('decisions')">Review Now</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-3 mt20">
+        <div class="card">
+          <div class="card-title">Recent Model Runs</div>
+          <div class="timeline">
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Curtailment Forecast Updated</div><div class="tl-body">Next 48h window generated with 91% confidence band</div><div class="tl-time">5 min ago · Predictive AI</div></div>
+            <div class="tl-item"><div class="tl-dot amber"></div><div class="tl-title">Load Sizing Optimization Run</div><div class="tl-body">Pincher Creek W1 — 40 MW recommended, pending human sign-off</div><div class="tl-time">38 min ago · Agentic AI</div></div>
+            <div class="tl-item"><div class="tl-dot blue"></div><div class="tl-title">Narrative Generated</div><div class="tl-body">Medicine Hat G2 executive brief updated with new AESO tariff data</div><div class="tl-time">2 hrs ago · Gen AI / RAG</div></div>
+            <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">Fiber Feasibility Scan</div><div class="tl-body">Vulcan Wind N2 — 3 provider options scored, latency risk flagged</div><div class="tl-time">Yesterday · Network Layer</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Data Freshness Indicators</div>
+          <div style="margin-bottom:6px;">
+            <div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">AESO Pool Price Feed</span><span class="tag tag-green" style="font-size:10px;">Live</span></div>
+            <div class="progress"><div class="progress-fill" style="width:98%"></div></div>
+          </div>
+          <div style="margin-bottom:6px;">
+            <div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Weather Forecast (NWP)</span><span class="tag tag-green" style="font-size:10px;">1h old</span></div>
+            <div class="progress"><div class="progress-fill" style="width:92%"></div></div>
+          </div>
+          <div style="margin-bottom:6px;">
+            <div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Generator Ops Data</span><span class="tag tag-amber" style="font-size:10px;">6h old</span></div>
+            <div class="progress"><div class="progress-fill amber" style="width:65%"></div></div>
+          </div>
+          <div style="margin-bottom:6px;">
+            <div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Regulatory Docs (RAG Index)</span><span class="tag tag-green" style="font-size:10px;">Current</span></div>
+            <div class="progress"><div class="progress-fill" style="width:100%"></div></div>
+          </div>
+          <div>
+            <div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Fiber / Telecom Data</span><span class="tag tag-amber" style="font-size:10px;">2d old</span></div>
+            <div class="progress"><div class="progress-fill amber" style="width:50%"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Platform Guardrails Active</div>
+          <div class="toggle-row"><span>Human approval required for siting decisions</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Confidence band displayed on all forecasts</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>RAG sources cited in all narratives</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Cross-client data isolation enforced</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>AI dispatch execution disabled</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Hallucination flagging (RAG-verified only)</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+          <div class="mt16 text-sm" style="background:#f0f4f9;border-radius:6px;padding:8px 10px;line-height:1.5;">
+            These controls are non-negotiable platform standards enforced at the infrastructure level. They are not configurable by end-users.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ SITE SCREENING ══════════════ -->
+    <div class="view" id="view-sitescreen">
+      <div class="page-header">
+        <div class="page-title">Site Screening</div>
+        <div class="page-sub">Multi-factor site evaluation across energy, grid, network, and regulatory dimensions</div>
+      </div>
+      <div class="alert-banner info">
+        <div class="alert-icon">ℹ️</div>
+        <div>Site scores are AI-generated composite indicators only. They do not constitute engineering, legal, or investment recommendations. All shortlisted sites require human review and formal feasibility study before proceeding to pre-FEED.</div>
+      </div>
+      <div class="grid-56">
+        <div>
+          <div class="card">
+            <div class="card-title">Screening Criteria Weights</div>
+            <div class="slider-row"><span class="slider-label">Curtailment potential</span><input type="range" min="0" max="100" value="35" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="slider-val">35%</span></div>
+            <div class="slider-row"><span class="slider-label">Grid connection quality</span><input type="range" min="0" max="100" value="25" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="slider-val">25%</span></div>
+            <div class="slider-row"><span class="slider-label">Network / fiber access</span><input type="range" min="0" max="100" value="15" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="slider-val">15%</span></div>
+            <div class="slider-row"><span class="slider-label">Regulatory ease</span><input type="range" min="0" max="100" value="15" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="slider-val">15%</span></div>
+            <div class="slider-row"><span class="slider-label">Land &amp; permitting</span><input type="range" min="0" max="100" value="10" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="slider-val">10%</span></div>
+            <div class="btn-row"><button class="btn btn-primary" onclick="alert('Re-scoring 6 active sites with updated weights...\nResults typically update within 90 seconds.')">Re-score Sites</button><button class="btn btn-outline">Reset to Default</button></div>
+          </div>
+          <div class="card mt16">
+            <div class="card-title">AI Confidence · Scoring Run</div>
+            <div class="confidence-bar"><span class="conf-label">Data completeness</span><div class="conf-track"><div class="conf-fill" style="width:88%;background:var(--teal)"></div></div><span style="font-size:12px;font-weight:700;margin-left:8px;">88%</span></div>
+            <div class="confidence-bar"><span class="conf-label">Model confidence</span><div class="conf-track"><div class="conf-fill" style="width:82%;background:var(--teal)"></div></div><span style="font-size:12px;font-weight:700;margin-left:8px;">82%</span></div>
+            <div class="confidence-bar"><span class="conf-label">RAG doc coverage</span><div class="conf-track"><div class="conf-fill" style="width:95%;background:var(--teal)"></div></div><span style="font-size:12px;font-weight:700;margin-left:8px;">95%</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Candidate Sites</div>
+          <table>
+            <thead><tr><th>Site</th><th>Type</th><th>Curtailment</th><th>Grid</th><th>Network</th><th>Score</th><th>Stage</th></tr></thead>
+            <tbody>
+              <tr onclick="alert('Medicine Hat G2\n\nCurtailment Score: 93 · Grid Score: 90 · Network Score: 87\n\nAI Summary: Strong curtailment capture opportunity. Substation has confirmed spare capacity. Single-mode fiber available within 2.1 km. Recommend proceeding to pre-FEED.')">
+                <td><b>Medicine Hat G2</b></td><td><span class="tag tag-navy">Solar + BESS</span></td><td>93</td><td>90</td><td>87</td><td><b style="color:var(--teal)">91</b></td><td><span class="tag tag-blue">Final Review</span></td>
+              </tr>
+              <tr onclick="alert('Pincher Creek W1\n\nCurtailment Score: 91 · Grid Score: 84 · Network Score: 79\n\nAI Summary: High wind curtailment frequency confirmed. Grid study pending on second interconnection. Recommend load sizing optimization before committing to configuration.')">
+                <td><b>Pincher Creek W1</b></td><td><span class="tag tag-navy">Wind + MDC</span></td><td>91</td><td>84</td><td>79</td><td><b style="color:var(--teal)">87</b></td><td><span class="tag tag-green">Pre-FEED</span></td>
+              </tr>
+              <tr onclick="alert('Taber Solar E1\n\nCurtailment Score: 86 · Grid Score: 83 · Network Score: 80\n\nAI Summary: Mid-day curtailment events are predictable. Battery sizing optimized for 4-hour duration. Fiber loop available from two providers. Low permitting risk.')">
+                <td><b>Taber Solar E1</b></td><td><span class="tag tag-navy">Solar + BESS</span></td><td>86</td><td>83</td><td>80</td><td><b style="color:var(--teal)">82</b></td><td><span class="tag tag-green">Pre-FEED</span></td>
+              </tr>
+              <tr><td><b>Lethbridge S3</b></td><td><span class="tag tag-navy">Solar + MDC</span></td><td>79</td><td>71</td><td>68</td><td><b style="color:var(--amber)">74</b></td><td><span class="tag tag-amber">Siting</span></td></tr>
+              <tr><td><b>Vulcan Wind N2</b></td><td><span class="tag tag-navy">Wind + BESS</span></td><td>68</td><td>60</td><td>55</td><td><b style="color:var(--muted)">61</b></td><td><span class="tag tag-navy">Screening</span></td></tr>
+              <tr><td><b>Brooks Hybrid P4</b></td><td><span class="tag tag-navy">Hybrid</span></td><td>55</td><td>62</td><td>71</td><td><b style="color:var(--muted)">62</b></td><td><span class="tag tag-navy">Screening</span></td></tr>
+            </tbody>
+          </table>
+          <div class="text-sm mt16" style="background:#fff8e6;border:1px solid #ffe099;border-radius:6px;padding:8px 12px;">
+            ⚠ Scores above 85 flagged for human review before advancing to pre-FEED. Click any row to view AI site brief.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ CURTAILMENT ══════════════ -->
+    <div class="view" id="view-curtailment">
+      <div class="page-header">
+        <div class="page-title">Curtailment Intelligence</div>
+        <div class="page-sub">Predictive AI layer · Renewable generation forecasting at 10-minute resolution</div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Forecast (Next 24h)</div><div class="kpi-value">147 <span style="font-size:14px">MWh</span></div><div class="kpi-delta up">Model confidence: 91%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Peak Curtailment Window</div><div class="kpi-value">11:00 <span style="font-size:14px">–15:00</span></div><div class="kpi-delta neutral">Solar oversupply expected · AESO data</div></div>
+        <div class="kpi-card"><div class="kpi-label">Actionable Curtailment</div><div class="kpi-value">108 <span style="font-size:14px">MWh</span></div><div class="kpi-delta up">73% capturable with proposed configuration</div></div>
+        <div class="kpi-card"><div class="kpi-label">30-Day Avg Curtailment</div><div class="kpi-value">119 <span style="font-size:14px">MWh/d</span></div><div class="kpi-delta neutral">Consistent pattern — weekend dip of 22%</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">48-Hour Curtailment Forecast with Confidence Band</div>
+          <div class="chart-wrap"><canvas id="chart-curtailment-band"></canvas></div>
+          <div class="text-sm mt16">Shaded band = 80% confidence interval. Forecast driven by NWP weather model + AESO historical patterns. <span class="read-only-chip">Read-only SCADA export</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Curtailment by Hour-of-Day (30-day historical)</div>
+          <div class="chart-wrap"><canvas id="chart-curtailment-heatmap"></canvas></div>
+          <div class="text-sm mt16">Peak curtailment hours: 11:00–15:00. Correlation with solar generation confirmed (R² = 0.87). Wind curtailment spread more evenly across overnight hours.</div>
+        </div>
+      </div>
+      <div class="grid-65 mt20">
+        <div class="card">
+          <div class="card-title">Monthly Curtailment Trend — Pincher Creek W1</div>
+          <div class="chart-wrap"><canvas id="chart-curtailment-monthly"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Curtailment Drivers</div>
+          <div style="margin-bottom:10px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Solar oversupply</span><span style="font-size:12px;font-weight:700;">41%</span></div><div class="progress"><div class="progress-fill" style="width:41%"></div></div></div>
+          <div style="margin-bottom:10px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Wind oversupply</span><span style="font-size:12px;font-weight:700;">29%</span></div><div class="progress"><div class="progress-fill" style="width:29%"></div></div></div>
+          <div style="margin-bottom:10px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Transmission congestion</span><span style="font-size:12px;font-weight:700;">18%</span></div><div class="progress"><div class="progress-fill amber" style="width:18%"></div></div></div>
+          <div><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Operational constraints</span><span style="font-size:12px;font-weight:700;">12%</span></div><div class="progress"><div class="progress-fill red" style="width:12%"></div></div></div>
+          <hr class="divider"/>
+          <div class="text-sm">Data sources: AESO public datasets · Historical SCADA exports (read-only) · NWP weather model. Proprietary generator data isolated per-client.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ SIZING ══════════════ -->
+    <div class="view" id="view-sizing">
+      <div class="page-header">
+        <div class="page-title">Load &amp; Storage Sizing Tool</div>
+        <div class="page-sub">Agentic optimization loop · Scenario-based, not autonomous dispatch</div>
+      </div>
+      <div class="alert-banner warn">
+        <div class="alert-icon">⚠️</div>
+        <div>Sizing recommendations are scenario outputs generated under defined technical and regulatory constraints. They are not automated commitments. All configurations require human sign-off before proceeding to engineering or procurement.</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Configuration Parameters</div>
+          <div class="slider-row"><span class="slider-label">Battery power (MW)</span><input type="range" min="10" max="100" value="40" id="sl-battery-mw" oninput="updateSizingOutputs()"><span class="slider-val" id="sv-battery-mw">40 MW</span></div>
+          <div class="slider-row"><span class="slider-label">Battery duration (h)</span><input type="range" min="1" max="8" value="4" id="sl-battery-h" oninput="updateSizingOutputs()"><span class="slider-val" id="sv-battery-h">4 h</span></div>
+          <div class="slider-row"><span class="slider-label">MDC load (MW)</span><input type="range" min="0" max="40" value="12" id="sl-mdc-mw" oninput="updateSizingOutputs()"><span class="slider-val" id="sv-mdc-mw">12 MW</span></div>
+          <div class="slider-row"><span class="slider-label">GPU load ramp rate (MW/h)</span><input type="range" min="1" max="20" value="8" id="sl-ramp" oninput="updateSizingOutputs()"><span class="slider-val" id="sv-ramp">8 MW/h</span></div>
+          <div class="slider-row"><span class="slider-label">Backup gen coverage (%)</span><input type="range" min="0" max="100" value="75" id="sl-backup" oninput="updateSizingOutputs()"><span class="slider-val" id="sv-backup">75%</span></div>
+          <hr class="divider"/>
+          <div class="card-title">Dispatch Priority</div>
+          <div class="toggle-row"><span>Prefer curtailment capture over market dispatch</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Enable ancillary services (when available)</span><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>MDC load flex window (±2h)</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="alert('Running agentic optimization loop...\nEvaluating 48 constraint-aware configurations.\nResults will appear in ~15 seconds.')">Run Optimization</button>
+            <button class="btn btn-outline">Compare Scenarios</button>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">Optimization Results · Current Configuration</div>
+            <div class="grid-2" style="gap:12px;margin-bottom:14px;">
+              <div style="text-align:center;padding:12px;background:#f0f4f9;border-radius:8px;"><div style="font-size:22px;font-weight:700;color:var(--teal)" id="out-capture">73%</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">Curtailment Captured</div></div>
+              <div style="text-align:center;padding:12px;background:#f0f4f9;border-radius:8px;"><div style="font-size:22px;font-weight:700;color:var(--text)" id="out-capex">$48M</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">Est. CAPEX (BESS + MDC)</div></div>
+              <div style="text-align:center;padding:12px;background:#f0f4f9;border-radius:8px;"><div style="font-size:22px;font-weight:700;color:var(--text)" id="out-irr">14.2%</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">Estimated IRR</div></div>
+              <div style="text-align:center;padding:12px;background:#f0f4f9;border-radius:8px;"><div style="font-size:22px;font-weight:700;color:var(--amber)" id="out-risk">Medium</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">Execution Risk</div></div>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-sizing-dispatch"></canvas></div>
+          </div>
+          <div class="card mt16">
+            <div class="card-title">Constraint Flags</div>
+            <div class="alert-banner warn" style="margin-bottom:8px;"><div class="alert-icon">⚠️</div><div><b>DFO Rule 5.3:</b> Backup generation sizing must be reviewed against distribution feeder limits. Human engineering review required.</div></div>
+            <div class="alert-banner info" style="margin-bottom:8px;"><div class="alert-icon">ℹ️</div><div><b>AESO Market Rule 203.7:</b> MDC load classified as dispatchable. Tariff implications to be reviewed by commercial team.</div></div>
+            <div class="alert-banner good"><div class="alert-icon">✅</div><div><b>Battery sizing</b> is within interconnection study limits. No additional study required at this stage.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ GRID ══════════════ -->
+    <div class="view" id="view-grid">
+      <div class="page-header">
+        <div class="page-title">Grid Interaction &amp; Backup Modeling</div>
+        <div class="page-sub">Predictive + Optimization · Simulation of real-world grid configurations</div>
+      </div>
+      <div class="grid-65">
+        <div>
+          <div class="card">
+            <div class="card-title">Scenario Comparison — Pincher Creek W1</div>
+            <div class="scenario-row">
+              <div class="scenario-row-header" onclick="toggleScenario(this)">
+                <span class="tag tag-green">Recommended</span>
+                <span class="scenario-name">Scenario A: 40 MW BESS + 12 MW MDC</span>
+                <span style="font-size:11px;color:var(--teal);font-weight:700;">Score: 87</span>
+                <span style="font-size:16px;color:var(--muted)">▼</span>
+              </div>
+              <div class="scenario-row-body open">
+                <div class="scenario-metrics">
+                  <div class="sm-box"><div class="sm-val" style="color:var(--teal)">73%</div><div class="sm-lab">Curtailment Captured</div></div>
+                  <div class="sm-box"><div class="sm-val">$48M</div><div class="sm-lab">Est. CAPEX</div></div>
+                  <div class="sm-box"><div class="sm-val">14.2%</div><div class="sm-lab">Est. IRR</div></div>
+                  <div class="sm-box"><div class="sm-val" style="color:var(--amber)">Med</div><div class="sm-lab">Execution Risk</div></div>
+                </div>
+                <div class="rag-box mt16">AI rationale: Optimal balance of curtailment capture and capital efficiency. BESS duration aligns with solar oversupply profile. MDC load provides dispatchable demand anchor. AESO Rule 203 tariff implications confirmed reviewed.</div>
+              </div>
+            </div>
+            <div class="scenario-row">
+              <div class="scenario-row-header" onclick="toggleScenario(this)">
+                <span class="tag tag-amber">Alternative</span>
+                <span class="scenario-name">Scenario B: 60 MW BESS only (no MDC)</span>
+                <span style="font-size:11px;color:var(--amber);font-weight:700;">Score: 74</span>
+                <span style="font-size:16px;color:var(--muted)">▶</span>
+              </div>
+              <div class="scenario-row-body">
+                <div class="scenario-metrics">
+                  <div class="sm-box"><div class="sm-val" style="color:var(--teal)">68%</div><div class="sm-lab">Curtailment Captured</div></div>
+                  <div class="sm-box"><div class="sm-val">$62M</div><div class="sm-lab">Est. CAPEX</div></div>
+                  <div class="sm-box"><div class="sm-val">11.8%</div><div class="sm-lab">Est. IRR</div></div>
+                  <div class="sm-box"><div class="sm-val" style="color:var(--teal)">Low</div><div class="sm-lab">Execution Risk</div></div>
+                </div>
+                <div class="rag-box mt16">Higher capital, lower IRR. Avoids MDC regulatory complexity. Suitable if compute deployment timeline is uncertain. Lower curtailment capture due to no dispatchable demand anchor during morning shoulder periods.</div>
+              </div>
+            </div>
+            <div class="scenario-row">
+              <div class="scenario-row-header" onclick="toggleScenario(this)">
+                <span class="tag tag-red">Flagged</span>
+                <span class="scenario-name">Scenario C: 20 MW BESS + 25 MW MDC</span>
+                <span style="font-size:11px;color:var(--red);font-weight:700;">Score: 52</span>
+                <span style="font-size:16px;color:var(--muted)">▶</span>
+              </div>
+              <div class="scenario-row-body">
+                <div class="scenario-metrics">
+                  <div class="sm-box"><div class="sm-val" style="color:var(--red)">41%</div><div class="sm-lab">Curtailment Captured</div></div>
+                  <div class="sm-box"><div class="sm-val">$55M</div><div class="sm-lab">Est. CAPEX</div></div>
+                  <div class="sm-box"><div class="sm-val">9.1%</div><div class="sm-lab">Est. IRR</div></div>
+                  <div class="sm-box"><div class="sm-val" style="color:var(--red)">High</div><div class="sm-lab">Execution Risk</div></div>
+                </div>
+                <div class="rag-box mt16">⚠ Not recommended: MDC load oversized relative to BESS buffer. Grid backup gap identified during peak demand events. Feeder thermal limit may be exceeded without engineering intervention. Requires human engineering review before further consideration.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">Grid Backup Coverage Model</div>
+            <div class="chart-wrap"><canvas id="chart-grid-backup"></canvas></div>
+            <div class="text-sm mt16">Backup model simulates generator failover and BESS discharge under 4 stress scenarios. Lines show load continuity by configuration.</div>
+          </div>
+          <div class="card mt16">
+            <div class="card-title">Grid Constraint Summary</div>
+            <table>
+              <thead><tr><th>Constraint</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Substation spare capacity</td><td><span class="tag tag-green">✓ Confirmed</span></td></tr>
+                <tr><td>Interconnection study</td><td><span class="tag tag-amber">⏳ Pending</span></td></tr>
+                <tr><td>Import/export cap (AESO)</td><td><span class="tag tag-green">✓ Within limits</span></td></tr>
+                <tr><td>Feeder thermal limit</td><td><span class="tag tag-amber">⚠ Verify at 25+ MW</span></td></tr>
+                <tr><td>Protection coordination</td><td><span class="tag tag-navy">Human review req'd</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ NETWORK ══════════════ -->
+    <div class="view" id="view-network">
+      <div class="page-header">
+        <div class="page-title">Network &amp; Fiber Feasibility</div>
+        <div class="page-sub">Analytical + AI-assisted · Assesses whether compute workloads are practically deployable</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Fiber &amp; Connectivity Map — Southern Alberta</div>
+          <div class="fiber-map" id="fiber-map" style="min-height:260px;">
+            <svg class="fiber-lines" id="fiber-svg"></svg>
+          </div>
+          <div class="flex-row mt16" style="gap:16px;flex-wrap:wrap;">
+            <div class="flex-row"><div style="width:12px;height:12px;border-radius:50%;background:var(--teal);border:2px solid #fff;box-shadow:0 0 0 2px var(--teal)"></div><span class="text-sm">MDC Site</span></div>
+            <div class="flex-row"><div style="width:12px;height:12px;border-radius:50%;background:var(--amber);border:2px solid #fff;box-shadow:0 0 0 2px var(--amber)"></div><span class="text-sm">Regional Hub</span></div>
+            <div class="flex-row"><div style="width:12px;height:12px;border-radius:50%;background:#6c8afd;border:2px solid #fff;box-shadow:0 0 0 2px #6c8afd"></div><span class="text-sm">Fiber PoP</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">Site Connectivity Assessment</div>
+            <table>
+              <thead><tr><th>Site</th><th>Nearest Fiber (km)</th><th>Latency Est.</th><th>Providers</th><th>Score</th></tr></thead>
+              <tbody>
+                <tr><td><b>Medicine Hat G2</b></td><td>2.1</td><td>8 ms</td><td>3</td><td><b style="color:var(--teal)">87</b></td></tr>
+                <tr><td><b>Pincher Creek W1</b></td><td>4.8</td><td>14 ms</td><td>2</td><td><b style="color:var(--teal)">79</b></td></tr>
+                <tr><td><b>Taber Solar E1</b></td><td>3.2</td><td>10 ms</td><td>2</td><td><b style="color:var(--teal)">80</b></td></tr>
+                <tr><td><b>Lethbridge S3</b></td><td>6.1</td><td>19 ms</td><td>1</td><td><b style="color:var(--amber)">68</b></td></tr>
+                <tr><td><b>Vulcan Wind N2</b></td><td>11.4</td><td>34 ms</td><td>1</td><td><b style="color:var(--red)">55</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card mt16">
+            <div class="card-title">Workload Latency Requirements</div>
+            <div class="slider-row"><span class="slider-label">Inference (ms max)</span><input type="range" min="5" max="100" value="20" oninput="this.nextElementSibling.textContent=this.value+' ms'"><span class="slider-val">20 ms</span></div>
+            <div class="slider-row"><span class="slider-label">Training (ms max)</span><input type="range" min="50" max="500" value="150" oninput="this.nextElementSibling.textContent=this.value+' ms'"><span class="slider-val">150 ms</span></div>
+            <div class="slider-row"><span class="slider-label">Storage I/O (ms max)</span><input type="range" min="5" max="50" value="15" oninput="this.nextElementSibling.textContent=this.value+' ms'"><span class="slider-val">15 ms</span></div>
+            <div class="text-sm mt16" style="background:#f0f4f9;border-radius:6px;padding:8px 10px;line-height:1.5;">
+              Latency thresholds filter sites automatically. Sites with latency estimates exceeding workload requirements are flagged in red.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card mt20">
+        <div class="card-title">Network Feasibility Summary — Vulcan Wind N2</div>
+        <div class="alert-banner warn">
+          <div class="alert-icon">⚠️</div>
+          <div><b>Latency Risk Flagged:</b> Nearest fiber PoP is 11.4 km. Estimated round-trip latency of 34 ms exceeds inference workload threshold of 20 ms. MDC deployment for latency-sensitive compute not recommended without fiber extension or microwave backhaul agreement.</div>
+        </div>
+        <div class="rag-box">
+          AI Assessment: Single-provider dependency at Vulcan Wind N2 represents a concentration risk for compute operations. Based on prior build cost benchmarks, a dedicated fiber extension of 11.4 km would add approximately $1.1–1.4M in capital cost and 4–6 months to the deployment timeline. A microwave backhaul alternative may reduce timeline risk but introduces weather-dependent reliability considerations. Both options require human engineering and commercial review before commitment.
+          <div class="rag-sources">Sources: <span class="rag-cite">Fiber provider maps</span> <span class="rag-cite">Telecom cost benchmarks</span> <span class="rag-cite">Internal build database</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ DECISIONS ══════════════ -->
+    <div class="view" id="view-decisions">
+      <div class="page-header">
+        <div class="page-title">Agentic Decision Support</div>
+        <div class="page-sub">AI proposes options · Humans remain the final decision-makers · No autonomous dispatch</div>
+      </div>
+      <div class="hitl-banner" style="margin-bottom:24px;">
+        <div class="hitl-icon">🔒</div>
+        <div class="hitl-text">
+          <div class="hitl-title">Human-in-the-Loop Enforcement Active</div>
+          <div class="hitl-sub">The AI agent has surfaced 3 recommendations requiring review. No actions will be taken until explicitly approved below. The agent does not execute dispatch, sign agreements, or submit regulatory filings.</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:8px 16px;font-size:22px;font-weight:700;color:#fff;">3 Pending</div>
+      </div>
+
+      <div class="decision-card">
+        <div class="decision-header">
+          <div>
+            <div class="flex-row" style="gap:8px;margin-bottom:6px;">
+              <span class="tag tag-amber">⏳ Awaiting Review</span>
+              <span class="tag tag-navy">Load Sizing</span>
+              <span class="tag tag-blue">Pincher Creek W1</span>
+            </div>
+            <div class="decision-title">Proceed with 40 MW BESS + 12 MW MDC configuration for pre-FEED engineering?</div>
+          </div>
+          <span style="font-size:22px;">🔋</span>
+        </div>
+        <div class="decision-body">The agentic optimization loop evaluated 48 constraint-aware configurations and identified Scenario A (40 MW / 4h BESS + 12 MW MDC load) as the highest-scoring option at 87/100. This configuration captures 73% of forecasted curtailment, achieves an estimated IRR of 14.2%, and remains within interconnection study limits. AESO tariff Rule 203.7 implications for dispatchable MDC load require commercial team review. DFO backup generator sizing requires distribution feeder verification.</div>
+        <div class="confidence-bar"><span class="conf-label">AI Confidence</span><div class="conf-track"><div class="conf-fill" style="width:87%;background:var(--teal)"></div></div><span style="font-size:12px;font-weight:700;margin-left:8px;">87%</span></div>
+        <div class="decision-meta">
+          <span class="tag tag-amber">Rule 203.7 flagged</span>
+          <span class="tag tag-navy">DFO verification needed</span>
+          <span class="tag tag-blue">Human sign-off required</span>
+          <span class="read-only-chip">Generated: 38 min ago</span>
+        </div>
+        <div class="decision-actions">
+          <button class="btn btn-primary" onclick="approveDecision(this, 'Pincher Creek W1 — Scenario A approved for pre-FEED. Engineering team notified.')">✓ Approve for Pre-FEED</button>
+          <button class="btn btn-outline" onclick="alert('Requesting additional scenario runs with modified MDC sizing constraints...')">↩ Request Revision</button>
+          <button class="btn btn-outline" onclick="navigate('sizing')">📊 View Full Analysis</button>
+          <button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="alert('Flagging for engineering team review and assigning to EPC contact...')">🚩 Escalate to Engineering</button>
+        </div>
+      </div>
+
+      <div class="decision-card">
+        <div class="decision-header">
+          <div>
+            <div class="flex-row" style="gap:8px;margin-bottom:6px;">
+              <span class="tag tag-amber">⏳ Awaiting Review</span>
+              <span class="tag tag-navy">Siting</span>
+              <span class="tag tag-blue">Medicine Hat G2</span>
+            </div>
+            <div class="decision-title">Advance Medicine Hat G2 to final investment committee package?</div>
+          </div>
+          <span style="font-size:22px;">📍</span>
+        </div>
+        <div class="decision-body">Medicine Hat G2 has achieved the highest composite site score (91/100) across all active sites. Curtailment data, grid capacity, and network feasibility are all confirmed at acceptable thresholds. The RAG layer has reviewed and incorporated the latest AESO tariff update (March 2026). The AI platform has generated an executive narrative for investment committee review. One outstanding item: Alberta ownership structure confirmation (Crown land vs. freehold) must be resolved by legal counsel before formal commitment.</div>
+        <div class="confidence-bar"><span class="conf-label">AI Confidence</span><div class="conf-track"><div class="conf-fill" style="width:91%;background:var(--teal)"></div></div><span style="font-size:12px;font-weight:700;margin-left:8px;">91%</span></div>
+        <div class="decision-meta">
+          <span class="tag tag-red">Legal review pending</span>
+          <span class="tag tag-green">Grid confirmed</span>
+          <span class="tag tag-green">Network confirmed</span>
+          <span class="tag tag-blue">IC package ready</span>
+        </div>
+        <div class="decision-actions">
+          <button class="btn btn-amber" onclick="approveDecision(this, 'Medicine Hat G2 advanced to IC preparation. Legal team notified for land ownership review.')">→ Advance to IC Prep</button>
+          <button class="btn btn-outline" onclick="navigate('narrative')">📝 View Executive Brief</button>
+          <button class="btn btn-outline">Hold — Legal Review</button>
+        </div>
+      </div>
+
+      <div class="decision-card">
+        <div class="decision-header">
+          <div>
+            <div class="flex-row" style="gap:8px;margin-bottom:6px;">
+              <span class="tag tag-red">⚠ Flagged</span>
+              <span class="tag tag-navy">Grid Risk</span>
+              <span class="tag tag-blue">Vulcan Wind N2</span>
+            </div>
+            <div class="decision-title">Pause Vulcan Wind N2 siting — feeder thermal limit and latency risk identified</div>
+          </div>
+          <span style="font-size:22px;">⚡</span>
+        </div>
+        <div class="decision-body">The grid interaction model has identified a potential feeder thermal limit breach at Vulcan Wind N2 under the 25 MW MDC load scenario. Additionally, the network feasibility layer flagged a single-provider dependency and latency estimate of 34 ms for inference workloads. The AI system is recommending a pause on further siting investment until (1) a distribution feeder study is completed, and (2) a fiber extension or backhaul alternative is evaluated. Proceeding without resolution of these items would increase execution risk.</div>
+        <div class="confidence-bar"><span class="conf-label">AI Confidence</span><div class="conf-track"><div class="conf-fill" style="width:78%;background:var(--amber)"></div></div><span style="font-size:12px;font-weight:700;margin-left:8px;">78%</span></div>
+        <div class="decision-meta">
+          <span class="tag tag-red">Feeder limit risk</span>
+          <span class="tag tag-red">Latency exceeds threshold</span>
+          <span class="tag tag-amber">Feeder study required</span>
+        </div>
+        <div class="decision-actions">
+          <button class="btn btn-outline" style="border-color:var(--red);color:var(--red);" onclick="approveDecision(this, 'Vulcan Wind N2 placed on hold. Engineering team notified to initiate feeder study and fiber evaluation.')">⏸ Confirm Pause</button>
+          <button class="btn btn-outline" onclick="navigate('network')">🌐 View Network Analysis</button>
+          <button class="btn btn-outline" onclick="navigate('grid')">🔌 View Grid Model</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ SCENARIOS ══════════════ -->
+    <div class="view" id="view-scenarios">
+      <div class="page-header">
+        <div class="page-title">Scenario Analysis</div>
+        <div class="page-sub">Agentic AI iterates through configurations under technical, economic, and regulatory constraints</div>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">Portfolio Scenario Comparison — All Active Sites</div>
+        <div class="chart-wrap"><canvas id="chart-scenarios"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Scenario Configuration Builder</div>
+          <div class="toggle-row"><span>Include transmission congestion risk</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Model Alberta vs. Ontario tariff variance</span><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Include alternative loads (crypto / AI / storage)</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Stress test: -20% curtailment forecast</span><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Stress test: +15% CAPEX escalation</span><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>Include ancillary services revenue</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="alert('Building scenario matrix with 6 active sites × 4 configurations × 3 stress cases...\nGenerating 72 scenario outputs. Estimated time: 45 seconds.')">Run Scenario Matrix</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Scenario Risk Summary</div>
+          <div class="alert-banner good" style="margin-bottom:8px;"><div class="alert-icon">✅</div><div><b>Base case:</b> 3 of 5 sites meet 12%+ IRR threshold under current forecasts.</div></div>
+          <div class="alert-banner info" style="margin-bottom:8px;"><div class="alert-icon">ℹ️</div><div><b>Downside case (-20% curtailment):</b> Only Medicine Hat G2 and Taber Solar E1 remain above IRR threshold.</div></div>
+          <div class="alert-banner warn"><div class="alert-icon">⚠️</div><div><b>Upside sensitivity:</b> AESO ancillary services eligibility could add 1.5–2.5% IRR for 2 sites. Requires tariff verification.</div></div>
+          <div class="text-sm mt16">All scenario outputs are probabilistic estimates based on historical data and defined assumptions. They do not constitute investment advice. Human commercial and engineering review required.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ NARRATIVE ══════════════ -->
+    <div class="view" id="view-narrative">
+      <div class="page-header">
+        <div class="page-title">Executive Narratives</div>
+        <div class="page-sub">Generative AI + RAG · Decision-ready planning summaries grounded in regulatory and engineering evidence</div>
+      </div>
+      <div class="grid-65">
+        <div>
+          <div class="card">
+            <div class="flex-row" style="margin-bottom:16px;">
+              <div class="card-title" style="margin-bottom:0;">Site Brief — Medicine Hat G2</div>
+              <div class="ml-auto">
+                <button class="btn btn-outline btn-sm" onclick="alert('Regenerating narrative with latest AESO data...')">↺ Refresh</button>
+                <button class="btn btn-primary btn-sm" style="margin-left:8px;" onclick="alert('Exporting to Word document for investment committee...')">Export</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+              <span class="tag tag-green">IC-Ready Brief</span>
+              <span class="tag tag-blue">Medicine Hat G2</span>
+              <span class="tag tag-navy">Solar + BESS</span>
+              <span class="read-only-chip">Generated: 2h ago · RAG v3.1</span>
+            </div>
+            <div class="rag-box">
+              <b>Summary:</b> Medicine Hat G2 represents VoltEdge MDC's highest-confidence siting opportunity in the current portfolio. The site achieves a composite score of 91/100 based on curtailment potential, grid readiness, and network accessibility. Modeled curtailment capture of 82% under the recommended 45 MW BESS / 4-hour configuration is supported by 18 months of AESO generation data and confirmed substation spare capacity at the local TFO level.
+              <br/><br/>
+              <b>Key Value Drivers:</b> The site benefits from consistent mid-day solar curtailment events averaging 4.2 hours in duration, a grid interconnection point with 48 MW of confirmed spare capacity, and fiber availability from three independent providers at under 2.2 km. These factors collectively reduce siting and execution risk to the lowest level across the active portfolio.
+              <br/><br/>
+              <b>Regulatory Context:</b> AESO Market Rule 203.7 has been reviewed for dispatchable MDC load classification. The updated March 2026 tariff guidance confirms that battery-backed compute loads may qualify for a reduced DFO rate if metering conditions are met. Alberta ownership structure for the parcel must be confirmed by legal counsel — Crown vs. freehold designation affects long-term lease structure.
+              <br/><br/>
+              <b>Recommended Next Steps:</b> (1) Resolve land tenure question through legal review. (2) Commission formal interconnection study with TFO. (3) Advance to investment committee with scenario comparison package.
+              <div class="rag-sources">
+                Sources: <span class="rag-cite">AESO Market Rule 203.7 (Mar 2026)</span> <span class="rag-cite">TFO capacity study — Southern AB</span> <span class="rag-cite">AESO curtailment dataset 2024–2025</span> <span class="rag-cite">VoltEdge internal feasibility model v4</span>
+              </div>
+            </div>
+            <div class="mt16 text-sm" style="background:#fff8e6;border:1px solid #ffe099;border-radius:6px;padding:8px 12px;line-height:1.5;">
+              ⚠ This narrative was generated using Retrieval-Augmented Generation and is subject to mandatory human review. It does not constitute a legal, financial, or engineering opinion. Sources are cited above for verification.
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">Narrative Library</div>
+            <table>
+              <thead><tr><th>Site</th><th>Type</th><th>Updated</th></tr></thead>
+              <tbody>
+                <tr onclick="alert('Loading Medicine Hat G2 IC Brief...')" style="cursor:pointer;"><td><b>Medicine Hat G2</b></td><td>IC Brief</td><td>2h ago</td></tr>
+                <tr onclick="alert('Loading Pincher Creek W1 Scenario Summary...')" style="cursor:pointer;"><td><b>Pincher Creek W1</b></td><td>Scenario Summary</td><td>4h ago</td></tr>
+                <tr onclick="alert('Loading Taber Solar E1 Pre-FEED Brief...')" style="cursor:pointer;"><td><b>Taber Solar E1</b></td><td>Pre-FEED Brief</td><td>Yesterday</td></tr>
+                <tr onclick="alert('Loading Vulcan Wind N2 Risk Summary...')" style="cursor:pointer;"><td><b>Vulcan Wind N2</b></td><td>Risk Summary</td><td>Yesterday</td></tr>
+                <tr onclick="alert('Loading Portfolio Scenario Narrative...')" style="cursor:pointer;"><td><b>Portfolio Overview</b></td><td>Exec. Scenario</td><td>2 days ago</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card mt16">
+            <div class="card-title">Generate New Narrative</div>
+            <div class="toggle-row"><span>Include regulatory constraints</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Include financial scenario range</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Include risk flags from AI models</span><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Cite all RAG sources</span><label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label></div>
+            <div class="btn-row"><button class="btn btn-primary w100" onclick="alert('Generating narrative...\nRetrieving regulatory documents, model outputs, and engineering data...\nExpected in 12 seconds.')">Generate Executive Brief</button></div>
+            <div class="text-sm mt16">All generated narratives are watermarked as AI-generated and require human review. Sources are auto-cited. Outputs are not dispatched or shared without explicit human approval.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ DATA SOURCES ══════════════ -->
+    <div class="view" id="view-data">
+      <div class="page-header">
+        <div class="page-title">Data Sources &amp; Configuration</div>
+        <div class="page-sub">Data Ingestion &amp; Normalization Layer · Structured and unstructured inputs</div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <div class="card">
+            <div class="section-title">Primary Structured Data — Predictive &amp; Optimization Models</div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--teal)"></div><div class="layer-name">AESO Pool Price &amp; Curtailment Feed</div><span class="tag tag-green" style="font-size:10px;">Live</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--teal)"></div><div class="layer-name">NWP Weather Model (Historical + Forecast)</div><span class="tag tag-green" style="font-size:10px;">1h</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--teal)"></div><div class="layer-name">Historical SCADA Exports</div><span class="tag tag-navy" style="font-size:10px;">Read-only</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--amber)"></div><div class="layer-name">Generator Operational Data</div><span class="tag tag-amber" style="font-size:10px;">6h</span><div class="layer-indicator ind-amber"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--teal)"></div><div class="layer-name">Battery &amp; Storage Vendor Specs</div><span class="tag tag-navy" style="font-size:10px;">Static</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--teal)"></div><div class="layer-name">GPU Load Profiles (MDC)</div><span class="tag tag-navy" style="font-size:10px;">Static</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:var(--amber)"></div><div class="layer-name">Fiber &amp; Telecom Cost Benchmarks</div><span class="tag tag-amber" style="font-size:10px;">2d</span><div class="layer-indicator ind-amber"></div></div>
+          </div>
+          <div class="card mt16">
+            <div class="section-title">Data Security &amp; Isolation</div>
+            <div class="alert-banner good" style="margin-bottom:8px;"><div class="alert-icon">🔒</div><div>Proprietary data is client-segmented. Models are parameterized per-project. Cross-client commingling is architecturally prevented.</div></div>
+            <div class="alert-banner info"><div class="alert-icon">ℹ️</div><div>Training data, live inputs, and RAG context are stored in separate, isolated layers with distinct access controls.</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="section-title">Secondary Unstructured Data — RAG / Generative AI Layer</div>
+            <div class="layer-pill"><div class="layer-dot" style="background:#6c8afd"></div><div class="layer-name">AESO Rules &amp; Tariff Documents</div><span class="tag tag-green" style="font-size:10px;">Mar 2026</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:#6c8afd"></div><div class="layer-name">DFO / TFO Engineering Guidance</div><span class="tag tag-green" style="font-size:10px;">Current</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:#6c8afd"></div><div class="layer-name">Interconnection Studies</div><span class="tag tag-amber" style="font-size:10px;">Partial</span><div class="layer-indicator ind-amber"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:#6c8afd"></div><div class="layer-name">Market &amp; Policy Documents</div><span class="tag tag-green" style="font-size:10px;">Current</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:#6c8afd"></div><div class="layer-name">Internal Feasibility Assumptions</div><span class="tag tag-navy" style="font-size:10px;">Client-segmented</span><div class="layer-indicator ind-green"></div></div>
+            <div class="layer-pill"><div class="layer-dot" style="background:#6c8afd"></div><div class="layer-name">FEED &amp; EPC Outputs (read-only)</div><span class="tag tag-navy" style="font-size:10px;">Input only</span><div class="layer-indicator ind-grey"></div></div>
+          </div>
+          <div class="card mt16">
+            <div class="section-title">Existing Tool Integrations <span style="font-size:11px;font-weight:400;color:var(--muted);">(AI augments, not replaces)</span></div>
+            <table>
+              <thead><tr><th>Tool / Platform</th><th>Integration Type</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>AESO Public Data API</td><td>Read-only feed</td><td><span class="tag tag-green">Active</span></td></tr>
+                <tr><td>SCADA Export (Historical)</td><td>File import</td><td><span class="tag tag-green">Active</span></td></tr>
+                <tr><td>Battery Vendor Portals</td><td>Spec import</td><td><span class="tag tag-green">Active</span></td></tr>
+                <tr><td>Fiber Provider Maps</td><td>Partner data</td><td><span class="tag tag-amber">Partial</span></td></tr>
+                <tr><td>FEED / EPC Outputs</td><td>Document input</td><td><span class="tag tag-amber">Manual</span></td></tr>
+                <tr><td>Grid / SCADA (Live)</td><td>None — by design</td><td><span class="tag tag-navy">Not connected</span></td></tr>
+              </tbody>
+            </table>
+            <div class="text-sm mt16" style="background:#f0f4f9;border-radius:6px;padding:8px 10px;line-height:1.5;">
+              The AI platform does not connect to live grid or SCADA control systems. It synthesizes outputs from existing tools to support planning decisions only.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ PERFORMANCE ══════════════ -->
+    <div class="view" id="view-performance">
+      <div class="page-header">
+        <div class="page-title">Performance &amp; Business Impact</div>
+        <div class="page-sub">Model metrics · KPI alignment · Evaluation methods · Expected returns</div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-icon">🎯</div><div class="kpi-label">Curtailment Forecast MAE</div><div class="kpi-value">4.2 <span style="font-size:14px;">%</span></div><div class="kpi-delta up">↓ MAPE · Day-ahead horizon · Target &lt;6%</div></div>
+        <div class="kpi-card"><div class="kpi-icon">⏱️</div><div class="kpi-label">Time-to-Decision (TTD)</div><div class="kpi-value">2.1 <span style="font-size:14px;">days</span></div><div class="kpi-delta up">↓ 68% vs. baseline (6.6d) · Target: &lt;3 days</div></div>
+        <div class="kpi-card"><div class="kpi-icon">🔌</div><div class="kpi-label">SCADA Ingestion Fidelity</div><div class="kpi-value">96.4 <span style="font-size:14px;">%</span></div><div class="kpi-delta neutral">Tag mapping accuracy · Timestamp alignment · Target: &gt;95%</div></div>
+        <div class="kpi-card"><div class="kpi-icon">💰</div><div class="kpi-label">IRR Uplift (Avg. Portfolio)</div><div class="kpi-value">+2.8 <span style="font-size:14px;">pts</span></div><div class="kpi-delta up">vs. pre-AI baseline · Better sizing + faster decisions</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Model Metric: Curtailment Forecast Error by Horizon</div>
+          <div class="chart-wrap"><canvas id="chart-perf-forecast"></canvas></div>
+          <div class="text-sm mt16">MAE/MAPE tracked across three forecast horizons. Calibration of confidence bands also measured — do the 80% bands contain 80% of realized outcomes? Better forecasts directly support revenue/value capture, CapEx efficiency, and risk reduction.</div>
+          <div class="alert-banner good" style="margin-top:14px;"><div class="alert-icon">✅</div><div>Day-ahead MAPE (4.2%) is within target. Week-ahead performance requires monitoring as new renewable capacity comes online in the AESO zone.</div></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">System Metric: Time-to-Decision (TTD)</div>
+            <div class="chart-wrap"><canvas id="chart-perf-ttd"></canvas></div>
+            <div class="text-sm mt16">Tracks elapsed time from first data ingestion to a complete decision packet ready for the investment committee. Every week of reduction = lower development burn and faster pipeline velocity.</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Integration Metric: SCADA Ingestion Fidelity</div>
+            <div style="margin-bottom:10px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Timestamp alignment (TZ / interval)</span><span style="font-size:12px;font-weight:700;color:var(--teal)">98.1%</span></div><div class="progress"><div class="progress-fill" style="width:98%"></div></div></div>
+            <div style="margin-bottom:10px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Range/quality checks passed</span><span style="font-size:12px;font-weight:700;color:var(--teal)">97.3%</span></div><div class="progress"><div class="progress-fill" style="width:97%"></div></div></div>
+            <div style="margin-bottom:10px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Tag mapping accuracy</span><span style="font-size:12px;font-weight:700;color:var(--amber)">93.8%</span></div><div class="progress"><div class="progress-fill amber" style="width:94%"></div></div></div>
+            <div><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:12px;flex:1;">Overall fidelity score</span><span style="font-size:12px;font-weight:700;color:var(--teal)">96.4%</span></div><div class="progress"><div class="progress-fill" style="width:96%"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt20">
+        <div class="card-title">KPI Alignment — Metrics → Business Outcomes</div>
+        <table>
+          <thead><tr><th>Metric</th><th>Type</th><th>Current</th><th>Target</th><th>Business KPI Supported</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><b>Curtailment Forecast MAE/MAPE</b></td><td><span class="tag tag-navy">Model</span></td><td>4.2% (day-ahead)</td><td>&lt;6%</td><td>Revenue capture uplift · CapEx efficiency · Customer trust</td><td><span class="tag tag-green">On Track</span></td></tr>
+            <tr><td><b>Forecast confidence band calibration</b></td><td><span class="tag tag-navy">Model</span></td><td>82% coverage</td><td>≥80%</td><td>Decision quality · Regulatory defensibility</td><td><span class="tag tag-green">On Track</span></td></tr>
+            <tr><td><b>Time-to-Decision (TTD)</b></td><td><span class="tag tag-blue">System</span></td><td>2.1 days</td><td>&lt;3 days</td><td>Sales cycle speed · Operating cost · Pipeline scalability</td><td><span class="tag tag-green">On Track</span></td></tr>
+            <tr><td><b>Decision packet rework rate</b></td><td><span class="tag tag-blue">System</span></td><td>8%</td><td>&lt;10%</td><td>Execution risk reduction · Analyst productivity</td><td><span class="tag tag-green">On Track</span></td></tr>
+            <tr><td><b>SCADA Ingestion Fidelity</b></td><td><span class="tag tag-amber">Integration</span></td><td>96.4%</td><td>≥95%</td><td>Time-to-value · Rework reduction · Client retention</td><td><span class="tag tag-green">On Track</span></td></tr>
+            <tr><td><b>RAG citation coverage rate</b></td><td><span class="tag tag-amber">Integration</span></td><td>94%</td><td>≥95%</td><td>Hallucination risk reduction · Regulatory trust</td><td><span class="tag tag-amber">Watch</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-2 mt20">
+        <div class="card">
+          <div class="card-title">Evaluation Methods</div>
+          <div class="timeline">
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Offline Backtesting (Predictive Layer)</div><div class="tl-body">Time-split validation on historical AESO/SCADA data with seasonal and regime splits. Tracks MAE/MAPE and confidence band calibration before any pilot.</div></div>
+            <div class="tl-item"><div class="tl-dot blue"></div><div class="tl-title">Shadow-Mode A/B Testing (System Impact)</div><div class="tl-body">AI runs in parallel with current workflow. Compares teams using AI packets vs. baseline on TTD, rework rate, and decision quality measured against actual curtailment/value outcomes.</div></div>
+            <div class="tl-item"><div class="tl-dot amber"></div><div class="tl-title">Human Evaluation (Decision-Readiness)</div><div class="tl-body">Structured rubric scoring by SMEs (grid, commercial, regulatory) on: correctness, completeness, explainability, and actionability. Inter-rater agreement tracked.</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">AI-Assisted Evaluation (Gen AI / RAG Outputs)</div><div class="tl-body">LLM-assisted ranking and citation checks. Every regulatory claim must have an approved source. Similarity scoring against gold-set packets detects drift early.</div></div>
+            <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">Continuous Performance Monitoring</div><div class="tl-body">Data freshness, hallucination triggers, and post-decision outcome tracking (forecast error, realized value capture vs. predicted) catches degradation early.</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">Expected Hard Returns (Direct Financial)</div>
+            <div style="margin-bottom:12px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:13px;flex:1;">Higher project IRR / margin uplift</span><span class="tag tag-green">Primary</span></div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Better sizing → capture more stranded/low-cost curtailed energy → improved project economics for utility clients.</div></div>
+            <div style="margin-bottom:12px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:13px;flex:1;">Lower CapEx misallocation</span><span class="tag tag-green">Primary</span></div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Avoid overbuild/underbuild of storage, interconnect, network, and backup via constraint-aware optimization.</div></div>
+            <div style="margin-bottom:12px;"><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:13px;flex:1;">Faster time-to-revenue</span><span class="tag tag-green">Primary</span></div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Compress site screening → feasibility → IC decision cycles from weeks to days. Reduces development burn and opportunity cost.</div></div>
+            <div><div class="flex-row" style="margin-bottom:4px;"><span style="font-size:13px;flex:1;">Lower execution risk costs</span><span class="tag tag-green">Primary</span></div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Surface grid, permitting, tariff, and fiber constraints earlier — reducing change orders, redesign, and delays.</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Expected Soft Returns (Strategic)</div>
+            <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);"><div style="font-size:13px;font-weight:600;margin-bottom:4px;">Customer trust &amp; satisfaction</div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Explainability, citations, and confidence bands allow utilities and investors to defend choices internally and with regulators.</div></div>
+            <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);"><div style="font-size:13px;font-weight:600;margin-bottom:4px;">Market differentiation</div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Not just "compute + renewables" — a repeatable decision engine that makes renewables + flexible load bankable.</div></div>
+            <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);"><div style="font-size:13px;font-weight:600;margin-bottom:4px;">Stronger utility partnerships</div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Human-led planning (not autonomous control) fits utility governance and increases likelihood of long-term pilots.</div></div>
+            <div><div style="font-size:13px;font-weight:600;margin-bottom:4px;">Learning moat</div><div class="text-sm" style="color:var(--muted);line-height:1.5;">Every deployed project improves scenario library, constraint patterns, and playbooks — making future deployments faster and more accurate.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ MONITORING ══════════════ -->
+    <div class="view" id="view-monitoring">
+      <div class="page-header">
+        <div class="page-title">Deployment &amp; Monitoring Strategy</div>
+        <div class="page-sub">System-integrated API architecture · Governance gates · Drift detection · Escalation rules</div>
+      </div>
+      <div class="alert-banner info" style="margin-bottom:20px;">
+        <div class="alert-icon">🏗️</div>
+        <div><b>Deployment approach: System-integrated (API-based).</b> Not a standalone chatbot — orchestrates workflows across multiple data sources via microservices with stable API contracts. Integrates alongside SCADA/grid tools via read-only connectors. Does not embed inside control systems.</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">API Layer Architecture — "Thin Waist" Design</div>
+          <div style="background:#1a2e44;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;line-height:1.8;color:#e0ecff;">
+            <div style="color:#00d4a0;margin-bottom:4px;">// Stable domain API contracts</div>
+            <div><span style="color:#f0a500;">POST</span> <span style="color:#8ecfff;">/forecast/curtailment</span></div>
+            <div><span style="color:#f0a500;">POST</span> <span style="color:#8ecfff;">/simulate/grid-interaction</span></div>
+            <div><span style="color:#f0a500;">POST</span> <span style="color:#8ecfff;">/optimize/load-sizing</span></div>
+            <div><span style="color:#f0a500;">POST</span> <span style="color:#8ecfff;">/rag/regulatory-interpretation</span></div>
+            <div><span style="color:#f0a500;">POST</span> <span style="color:#8ecfff;">/generate/executive-brief</span></div>
+            <div style="color:#6b82a0;margin-top:8px;font-size:11px;">// Interface stable even if underlying model changes</div>
+            <div style="color:#6b82a0;font-size:11px;">// Blue/green deployments via containerized services</div>
+            <div style="color:#6b82a0;font-size:11px;">// LLM gateway wraps all external AI providers</div>
+          </div>
+          <div class="text-sm mt16">Each model is packaged as a container with pinned dependencies. An internal LLM gateway handles prompt templates, safety policies, logging, cost controls, and provider fallback.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Modular Component Architecture</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="background:#eaf7f3;border:1px solid #b2e5d5;border-radius:8px;padding:12px;"><div style="font-size:12px;font-weight:700;color:var(--teal2);margin-bottom:4px;">UI Layer</div><div class="text-sm">Web app + PowerBI/Tableau outputs · Decision packet export</div></div>
+            <div style="text-align:center;font-size:16px;color:var(--muted);">↕</div>
+            <div style="background:#e8f0fb;border:1px solid #b8d0f5;border-radius:8px;padding:12px;"><div style="font-size:12px;font-weight:700;color:#2563ab;margin-bottom:4px;">Orchestration Layer (Temporal / Airflow / Prefect)</div><div class="text-sm">Calls services in sequence · Enforces human approval gates · Logs full lineage</div></div>
+            <div style="text-align:center;font-size:16px;color:var(--muted);">↕</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+              <div style="background:#f0f4f9;border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;font-size:11px;font-weight:600;">Predictive<br/>Container</div>
+              <div style="background:#f0f4f9;border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;font-size:11px;font-weight:600;">Optimizer<br/>Container</div>
+              <div style="background:#f0f4f9;border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;font-size:11px;font-weight:600;">RAG / LLM<br/>Container</div>
+            </div>
+            <div style="text-align:center;font-size:16px;color:var(--muted);">↕</div>
+            <div style="background:#fff8e6;border:1px solid #ffe099;border-radius:8px;padding:12px;"><div style="font-size:12px;font-weight:700;color:#b37800;margin-bottom:4px;">Data Sources (Read-Only Connectors)</div><div class="text-sm">AESO · SCADA exports · Weather API · Fiber maps · RAG doc store</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt20">
+        <div class="card-title">Human Oversight &amp; Governance Gates</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+          <div style="background:#f0f4f9;border:2px solid var(--teal);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--teal);margin-bottom:8px;">Gate 0</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Data Ingestion Validation</div>
+            <div class="text-sm" style="line-height:1.6;margin-bottom:8px;">Automated + spot check every ingestion run; weekly human review. Blocks downstream if freshness or quality fails.</div>
+            <div style="font-size:11px;color:var(--muted);">Owner: Data/ML Engineer<br/>Frequency: Every run + weekly</div>
+          </div>
+          <div style="background:#f0f4f9;border:2px solid #6c8afd;border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#2563ab;margin-bottom:8px;">Gate 1</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Model Health Review</div>
+            <div class="text-sm" style="line-height:1.6;margin-bottom:8px;">Forecast MAE/MAPE by horizon, constraint violations, scenario runtime, cost per decision packet reviewed by ML lead + power systems SME.</div>
+            <div style="font-size:11px;color:var(--muted);">Weekly (first 12 wks) → biweekly</div>
+          </div>
+          <div style="background:#f0f4f9;border:2px solid var(--amber);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--amber);margin-bottom:8px;">Gate 2</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Decision Packet Review</div>
+            <div class="text-sm" style="line-height:1.6;margin-bottom:8px;">Two-person rule: Power systems SME + Commercial/regulatory SME. Required before any IC or site commitment output is exported as client-facing.</div>
+            <div style="font-size:11px;color:var(--muted);">Per decision packet<br/>Outcome: Approve / Revise / Escalate</div>
+          </div>
+          <div style="background:#f0f4f9;border:2px solid var(--navy);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--navy);margin-bottom:8px;">Gate 3</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Quarterly Governance</div>
+            <div class="text-sm" style="line-height:1.6;margin-bottom:8px;">Drift review, new regulations, model swaps/upgrades, incident post-mortems, and roadmap decisions with Head of Product, Engineering, and key client reps.</div>
+            <div style="font-size:11px;color:var(--muted);">Quarterly · Leadership + Client Reps</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--red);">⚡ Immediate Escalation Triggers (Same Day)</div>
+            <div class="alert-banner warn" style="margin-bottom:8px;"><div class="alert-icon">🚨</div><div>Regulatory/tariff output cites missing or outdated docs (e.g., superseded AESO guidance)</div></div>
+            <div class="alert-banner warn" style="margin-bottom:8px;"><div class="alert-icon">🚨</div><div>Optimization proposes infeasible action (violates interconnection, equipment limits, or contract terms)</div></div>
+            <div class="alert-banner warn" style="margin-bottom:8px;"><div class="alert-icon">🚨</div><div>Data lineage breaks — cannot reproduce inputs used for an output</div></div>
+            <div class="alert-banner warn"><div class="alert-icon">🚨</div><div>High-risk recommendation above CapEx threshold without required approvals</div></div>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--amber);">⏰ 48-Hour Escalation Triggers</div>
+            <div class="alert-banner info" style="margin-bottom:8px;"><div class="alert-icon">⚠️</div><div>Forecast error exceeds threshold for 2 consecutive review windows</div></div>
+            <div class="alert-banner info" style="margin-bottom:8px;"><div class="alert-icon">⚠️</div><div>Constraint violations rise above defined tolerance even if outputs "look reasonable"</div></div>
+            <div style="font-size:13px;font-weight:700;margin-top:14px;margin-bottom:10px;">📋 Escalation Outcomes</div>
+            <div class="text-sm" style="line-height:1.8;background:#f0f4f9;border-radius:6px;padding:10px;">
+              → Freeze model version (pin to last approved)<br/>
+              → Require additional SME sign-off for that jurisdiction/site<br/>
+              → Launch targeted retraining / prompt+RAG remediation<br/>
+              → Issue client advisory if prior outputs may be impacted
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt20">
+        <div class="card-title">Live Monitoring Dashboard — Drift &amp; Health Signals</div>
+        <div class="grid-3" style="margin-bottom:20px;">
+          <div class="card" style="border:1px solid var(--border);">
+            <div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">A · Data Drift</div>
+            <div style="margin-bottom:8px;">
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">AESO feed freshness</span><span class="tag tag-green" style="font-size:10px;">✓ Live</span></div>
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">Curtailment distribution PSI</span><span class="tag tag-green" style="font-size:10px;">Normal</span></div>
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">Pool price distribution KS</span><span class="tag tag-green" style="font-size:10px;">Normal</span></div>
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">SCADA interval missingness</span><span class="tag tag-amber" style="font-size:10px;">1.2% missing</span></div>
+              <div class="flex-row"><span style="font-size:12px;flex:1;">Schema change alerts</span><span class="tag tag-green" style="font-size:10px;">None</span></div>
+            </div>
+            <div class="text-sm" style="color:var(--muted);">Tools: Great Expectations + Monte Carlo</div>
+          </div>
+          <div class="card" style="border:1px solid var(--border);">
+            <div style="font-size:12px;font-weight:700;color:#2563ab;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">B · Model Drift</div>
+            <div class="chart-wrap"><canvas id="chart-model-drift"></canvas></div>
+            <div class="text-sm mt16" style="color:var(--muted);">MAE/MAPE tracked by horizon. Week-ahead showing slight degradation — new wind capacity flagged as probable cause.</div>
+          </div>
+          <div class="card" style="border:1px solid var(--border);">
+            <div style="font-size:12px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">C · Concept Drift</div>
+            <div style="margin-bottom:8px;">
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">RAG doc freshness</span><span class="tag tag-green" style="font-size:10px;">Current</span></div>
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">AESO rule corpus version</span><span class="tag tag-green" style="font-size:10px;">Mar 2026</span></div>
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">SME override rate (30d)</span><span class="tag tag-amber" style="font-size:10px;">11% ↑</span></div>
+              <div class="flex-row" style="margin-bottom:3px;"><span style="font-size:12px;flex:1;">Price regime shift flag</span><span class="tag tag-green" style="font-size:10px;">None</span></div>
+              <div class="flex-row"><span style="font-size:12px;flex:1;">Constraint pattern change</span><span class="tag tag-green" style="font-size:10px;">None</span></div>
+            </div>
+            <div class="alert-banner warn" style="font-size:11px;padding:8px;"><div class="alert-icon">⚠️</div><div>SME override rate trending up (11%). Regulatory SME to review — may reflect new AESO interconnection guidance not yet in RAG corpus.</div></div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-monitoring-health"></canvas></div>
+      </div>
+
+      <div class="grid-2 mt20">
+        <div class="card">
+          <div class="card-title">Review Cadence — First 90 Days (New Client)</div>
+          <table>
+            <thead><tr><th>Review Type</th><th>Frequency</th><th>Coverage</th></tr></thead>
+            <tbody>
+              <tr><td>Model health review</td><td>Weekly</td><td>All sites</td></tr>
+              <tr><td>Decision packet review</td><td>Per packet</td><td><b>100%</b></td></tr>
+              <tr><td>Regulatory narrative review</td><td>Per output</td><td><b>100%</b></td></tr>
+              <tr><td>Red-team test (hallucinations)</td><td>Monthly</td><td>Full harness</td></tr>
+              <tr><td>Data ingestion spot check</td><td>Weekly</td><td>All feeds</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Review Cadence — Steady State (After Stabilization)</div>
+          <table>
+            <thead><tr><th>Review Type</th><th>Frequency</th><th>Coverage</th></tr></thead>
+            <tbody>
+              <tr><td>Model health review</td><td>Biweekly</td><td>All sites</td></tr>
+              <tr><td>Decision packet review</td><td>Per packet (sampled)</td><td>25–50% (risk-based)</td></tr>
+              <tr><td>Regulatory narrative review</td><td>Per packet</td><td><b>100% (new jurisdiction)</b></td></tr>
+              <tr><td>Governance + drift review</td><td>Quarterly</td><td>Full platform</td></tr>
+              <tr><td>Bias / fairness audit</td><td>Quarterly</td><td>All site archetypes</td></tr>
+            </tbody>
+          </table>
+          <div class="alert-banner info" style="margin-top:14px;"><div class="alert-icon">ℹ️</div><div>100% decision packet review always required for: new jurisdiction, new market product, or new interconnection class — regardless of maturity stage.</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ── NAVIGATION ──
+const views = ['dashboard','sitescreen','curtailment','sizing','grid','network','decisions','scenarios','narrative','performance','monitoring','data'];
+const titles = {
+  dashboard: 'Platform Dashboard', sitescreen: 'Site Screening',
+  curtailment: 'Curtailment Intelligence', sizing: 'Load & Storage Sizing',
+  grid: 'Grid Interaction Modeling', network: 'Network & Fiber Feasibility',
+  decisions: 'Agentic Decision Support', scenarios: 'Scenario Analysis',
+  narrative: 'Executive Narratives', performance: 'Performance & Business Impact',
+  monitoring: 'Deployment & Monitoring Strategy', data: 'Data Sources & Configuration'
+};
+
+function navigate(id) {
+  views.forEach(v => document.getElementById('view-'+v).classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.getElementById('tb-title').textContent = titles[id] || id;
+  document.querySelectorAll('.sb-item').forEach(el => {
+    el.classList.remove('active');
+    if (el.getAttribute('onclick') && el.getAttribute('onclick').includes("'"+id+"'")) el.classList.add('active');
+  });
+  initChartsFor(id);
+  if (id === 'network') setTimeout(buildFiberMap, 50);
+}
+
+function toggleScenario(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('span:last-child');
+  body.classList.toggle('open');
+  arrow.textContent = body.classList.contains('open') ? '▼' : '▶';
+}
+
+function approveDecision(btn, msg) {
+  const card = btn.closest('.decision-card');
+  const statusTag = card.querySelector('.tag-amber, .tag-red');
+  if (statusTag) { statusTag.textContent = '✓ Approved'; statusTag.className = 'tag tag-green'; }
+  btn.disabled = true; btn.textContent = '✓ Approved';
+  alert('Decision recorded: ' + msg + '\n\nThis action has been logged with timestamp and user attribution for audit purposes.');
+}
+
+function updateSizingOutputs() {
+  const mw = parseInt(document.getElementById('sl-battery-mw').value);
+  const h  = parseInt(document.getElementById('sl-battery-h').value);
+  const mdc = parseInt(document.getElementById('sl-mdc-mw').value);
+  document.getElementById('sv-battery-mw').textContent = mw + ' MW';
+  document.getElementById('sv-battery-h').textContent  = h + ' h';
+  document.getElementById('sv-mdc-mw').textContent     = mdc + ' MW';
+  const capture = Math.min(95, 45 + (mw/100)*30 + (mdc/40)*15);
+  const capex   = (mw * 0.9 + mdc * 0.5 + h * 1.2).toFixed(0);
+  const irr     = (8 + (capture/100)*8 - (capex/100)*0.5).toFixed(1);
+  const risk    = capture > 70 ? 'Medium' : capture > 55 ? 'Low' : 'High';
+  document.getElementById('out-capture').textContent = Math.round(capture) + '%';
+  document.getElementById('out-capex').textContent   = '$' + capex + 'M';
+  document.getElementById('out-irr').textContent     = irr + '%';
+  document.getElementById('out-risk').textContent    = risk;
+  document.getElementById('sv-ramp').textContent     = document.getElementById('sl-ramp').value + ' MW/h';
+  document.getElementById('sv-backup').textContent   = document.getElementById('sl-backup').value + '%';
+}
+
+// ── CHARTS ──
+const chartInstances = {};
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+function initChartsFor(view) {
+  if (view === 'dashboard') initDashboardCharts();
+  if (view === 'curtailment') initCurtailmentCharts();
+  if (view === 'sizing') initSizingCharts();
+  if (view === 'grid') initGridCharts();
+  if (view === 'scenarios') initScenarioCharts();
+  if (view === 'performance') initPerformanceCharts();
+  if (view === 'monitoring') initMonitoringCharts();
+}
+
+function initDashboardCharts() {
+  destroyChart('chart-curtailment-main');
+  const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const data   = [98,124,147,135,162,89,72];
+  const upper  = data.map(v => v+22);
+  const lower  = data.map(v => v-18);
+  const ctx = document.getElementById('chart-curtailment-main').getContext('2d');
+  chartInstances['chart-curtailment-main'] = new Chart(ctx, {
+    data: { labels, datasets: [
+      { type:'line', label:'Forecast', data, borderColor:'#00a878', backgroundColor:'rgba(0,168,120,0.1)', tension:.4, fill:false, borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#00a878' },
+      { type:'line', label:'Upper bound', data:upper, borderColor:'rgba(0,168,120,0.2)', fill:'+1', borderWidth:1, pointRadius:0, tension:.4 },
+      { type:'line', label:'Lower bound', data:lower, borderColor:'rgba(0,168,120,0.2)', fill:false, borderWidth:1, pointRadius:0, tension:.4 },
+    ]},
+    options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ title:{ display:true, text:'MWh' }, grid:{ color:'#e8eef4' } }, x:{ grid:{ color:'#e8eef4' } } } }
+  });
+}
+
+function initCurtailmentCharts() {
+  destroyChart('chart-curtailment-band');
+  const hours = Array.from({length:49},(_,i)=>(i%24).toString().padStart(2,'0')+':00');
+  const base  = hours.map((_,i)=>{ const h=i%24; return h>=10&&h<=15?15+Math.random()*12+(h-10)*4:Math.max(0,3+Math.random()*8); });
+  const upper = base.map(v=>v+8+Math.random()*5);
+  const lower = base.map(v=>Math.max(0,v-7-Math.random()*4));
+  const ctx2  = document.getElementById('chart-curtailment-band').getContext('2d');
+  chartInstances['chart-curtailment-band'] = new Chart(ctx2, {
+    data: { labels:hours.filter((_,i)=>i%3===0), datasets:[
+      { type:'line', label:'Forecast', data:base.filter((_,i)=>i%3===0), borderColor:'#00a878', borderWidth:2.5, tension:.4, fill:false, pointRadius:2 },
+      { type:'line', label:'Upper (80%)', data:upper.filter((_,i)=>i%3===0), borderColor:'rgba(0,168,120,0.15)', fill:'+1', borderWidth:1, pointRadius:0, tension:.4, backgroundColor:'rgba(0,168,120,0.12)' },
+      { type:'line', label:'Lower (80%)', data:lower.filter((_,i)=>i%3===0), borderColor:'rgba(0,168,120,0.15)', fill:false, borderWidth:1, pointRadius:0, tension:.4 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{ size:11 } } } }, scales:{ y:{ title:{ display:true, text:'MW curtailed' }, grid:{ color:'#e8eef4' } }, x:{ grid:{ color:'#e8eef4' } } } }
+  });
+  destroyChart('chart-curtailment-heatmap');
+  const hodLabels = Array.from({length:24},(_,i)=>i.toString().padStart(2,'0')+':00');
+  const hodData   = hodLabels.map((_,i)=>i>=10&&i<=15?12+Math.random()*8:i>=19||i<=5?4+Math.random()*4:2+Math.random()*3);
+  const ctx3 = document.getElementById('chart-curtailment-heatmap').getContext('2d');
+  chartInstances['chart-curtailment-heatmap'] = new Chart(ctx3, {
+    type:'bar', data:{ labels:hodLabels, datasets:[{ label:'Avg MWh curtailed', data:hodData, backgroundColor:hodData.map(v=>v>14?'rgba(240,165,0,0.8)':v>8?'rgba(0,168,120,0.7)':'rgba(0,168,120,0.3)'), borderRadius:3 }] },
+    options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{ title:{display:true,text:'MWh'}, grid:{color:'#e8eef4'} }, x:{ ticks:{maxRotation:45,font:{size:10}}, grid:{display:false} } } }
+  });
+  destroyChart('chart-curtailment-monthly');
+  const months = ['Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
+  const mData  = [2840,3120,2680,1920,1540,2100,2760,3210,3580];
+  const ctx4 = document.getElementById('chart-curtailment-monthly').getContext('2d');
+  chartInstances['chart-curtailment-monthly'] = new Chart(ctx4, {
+    type:'bar', data:{ labels:months, datasets:[{ label:'Monthly curtailment (MWh)', data:mData, backgroundColor:'rgba(0,168,120,0.7)', borderRadius:4 }] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{title:{display:true,text:'MWh'},grid:{color:'#e8eef4'}}, x:{grid:{display:false}} } }
+  });
+}
+
+function initSizingCharts() {
+  destroyChart('chart-sizing-dispatch');
+  const labels = Array.from({length:24},(_,i)=>i+':00');
+  const curtail = labels.map((_,i)=>i>=10&&i<=15?12+Math.random()*8:Math.random()*3);
+  const bess    = labels.map((v,i)=>Math.min(curtail[i],10));
+  const mdc     = labels.map((_,i)=>i>=8&&i<=20?10+Math.random()*2:0);
+  const ctx = document.getElementById('chart-sizing-dispatch').getContext('2d');
+  chartInstances['chart-sizing-dispatch'] = new Chart(ctx, {
+    type:'line', data:{ labels, datasets:[
+      { label:'Available curtailment', data:curtail, borderColor:'rgba(240,165,0,0.8)', fill:true, backgroundColor:'rgba(240,165,0,0.1)', tension:.4, borderWidth:1.5, pointRadius:0 },
+      { label:'BESS capture', data:bess, borderColor:'#00a878', fill:true, backgroundColor:'rgba(0,168,120,0.15)', tension:.4, borderWidth:2, pointRadius:0 },
+      { label:'MDC load', data:mdc, borderColor:'#6c8afd', fill:false, tension:.4, borderWidth:1.5, borderDash:[4,3], pointRadius:0 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:11} } } }, scales:{ y:{title:{display:true,text:'MW'},grid:{color:'#e8eef4'}}, x:{grid:{display:false},ticks:{maxTicksLimit:8}} } }
+  });
+}
+
+function initGridCharts() {
+  destroyChart('chart-grid-backup');
+  const labels = ['T+0','T+1','T+2','T+4','T+8','T+16'];
+  const ctx = document.getElementById('chart-grid-backup').getContext('2d');
+  chartInstances['chart-grid-backup'] = new Chart(ctx, {
+    type:'line', data:{ labels, datasets:[
+      { label:'Scenario A (40MW BESS)', data:[100,98,96,95,93,92], borderColor:'#00a878', borderWidth:2.5, tension:.4, pointRadius:3 },
+      { label:'Scenario B (60MW BESS)', data:[100,99,98,97,96,95], borderColor:'#6c8afd', borderWidth:2, tension:.4, pointRadius:3 },
+      { label:'Scenario C (20MW BESS)', data:[100,94,87,78,71,68], borderColor:'#e74c3c', borderWidth:2, borderDash:[4,3], tension:.4, pointRadius:3 },
+      { label:'No BESS (baseline)',     data:[100,89,78,62,51,44], borderColor:'#b0bec5', borderWidth:1.5, borderDash:[2,4], tension:.4, pointRadius:2 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:11} } } }, scales:{ y:{ title:{display:true,text:'% Load Continuity'}, min:40, grid:{color:'#e8eef4'} }, x:{ title:{display:true,text:'Hours after grid event'}, grid:{display:false} } } }
+  });
+}
+
+function initScenarioCharts() {
+  destroyChart('chart-scenarios');
+  const ctx = document.getElementById('chart-scenarios').getContext('2d');
+  chartInstances['chart-scenarios'] = new Chart(ctx, {
+    type:'bar', data:{ labels:['Medicine Hat G2','Pincher Creek W1','Taber Solar E1','Lethbridge S3','Vulcan Wind N2'], datasets:[
+      { label:'Base Case IRR (%)',             data:[16.2,14.2,13.8,10.4,8.1], backgroundColor:'rgba(0,168,120,0.8)', borderRadius:4 },
+      { label:'Downside IRR (-20% curtailment)',data:[13.1,11.0,11.2,7.8,5.2],  backgroundColor:'rgba(240,165,0,0.7)', borderRadius:4 },
+      { label:'Upside IRR (+ancillary services)',data:[18.4,15.8,15.9,11.2,8.8], backgroundColor:'rgba(108,138,253,0.7)', borderRadius:4 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:12} } } }, scales:{ y:{ title:{display:true,text:'IRR (%)'}, grid:{color:'#e8eef4'} }, x:{ grid:{display:false} } } }
+  });
+}
+
+function initPerformanceCharts() {
+  destroyChart('chart-perf-forecast');
+  const ctx = document.getElementById('chart-perf-forecast').getContext('2d');
+  chartInstances['chart-perf-forecast'] = new Chart(ctx, {
+    type:'bar', data:{ labels:['10-min Interval','Hour-Ahead','Day-Ahead','3-Day','Week-Ahead'], datasets:[
+      { label:'MAPE (%) — Current', data:[2.1,2.8,4.2,6.1,9.4], backgroundColor:'rgba(0,168,120,0.8)', borderRadius:4 },
+      { label:'Target Threshold (%)', data:[3,4,6,8,12], backgroundColor:'rgba(240,165,0,0.3)', borderRadius:4, borderColor:'rgba(240,165,0,0.8)', borderWidth:1 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:11} } } }, scales:{ y:{ title:{display:true,text:'MAPE (%)'}, grid:{color:'#e8eef4'} }, x:{ grid:{display:false} } } }
+  });
+  destroyChart('chart-perf-ttd');
+  const ctx2 = document.getElementById('chart-perf-ttd').getContext('2d');
+  chartInstances['chart-perf-ttd'] = new Chart(ctx2, {
+    type:'line', data:{ labels:['Baseline','Month 1','Month 2','Month 3','Month 4','Month 5','Current'], datasets:[
+      { label:'Time-to-Decision (days)', data:[6.6,5.2,4.1,3.4,2.8,2.3,2.1], borderColor:'#00a878', backgroundColor:'rgba(0,168,120,0.1)', fill:true, tension:.4, borderWidth:2.5, pointRadius:4 },
+      { label:'Target (3 days)', data:[3,3,3,3,3,3,3], borderColor:'rgba(240,165,0,0.7)', borderDash:[5,4], borderWidth:1.5, pointRadius:0 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:11} } } }, scales:{ y:{ title:{display:true,text:'Days'}, grid:{color:'#e8eef4'} }, x:{ grid:{display:false} } } }
+  });
+}
+
+function initMonitoringCharts() {
+  destroyChart('chart-model-drift');
+  const ctx = document.getElementById('chart-model-drift').getContext('2d');
+  chartInstances['chart-model-drift'] = new Chart(ctx, {
+    type:'line', data:{ labels:['Oct','Nov','Dec','Jan','Feb','Mar','Apr'], datasets:[
+      { label:'Day-ahead MAPE',  data:[3.9,4.0,4.1,4.0,4.2,4.2,4.2], borderColor:'#00a878', tension:.4, borderWidth:2, pointRadius:3 },
+      { label:'Week-ahead MAPE', data:[8.1,8.4,8.8,9.0,9.2,9.3,9.4], borderColor:'#f0a500', tension:.4, borderWidth:2, pointRadius:3 },
+      { label:'Target (day-ahead)',data:[6,6,6,6,6,6,6], borderColor:'rgba(231,76,60,0.4)', borderDash:[4,3], borderWidth:1, pointRadius:0 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:10} } } }, scales:{ y:{ title:{display:true,text:'MAPE (%)'}, grid:{color:'#e8eef4'} }, x:{ grid:{display:false} } } }
+  });
+  destroyChart('chart-monitoring-health');
+  const ctx2 = document.getElementById('chart-monitoring-health').getContext('2d');
+  chartInstances['chart-monitoring-health'] = new Chart(ctx2, {
+    type:'line', data:{ labels:['Wk 1','Wk 2','Wk 3','Wk 4','Wk 5','Wk 6','Wk 7','Wk 8'], datasets:[
+      { label:'SCADA Ingestion Fidelity (%)', data:[94.1,95.2,96.0,95.8,96.4,97.0,96.8,96.4], borderColor:'#00a878', tension:.4, borderWidth:2.5, yAxisID:'y', pointRadius:3 },
+      { label:'RAG Citation Coverage (%)',    data:[91.0,92.4,93.1,93.8,94.0,94.5,94.2,94.0], borderColor:'#6c8afd', tension:.4, borderWidth:2,   yAxisID:'y', pointRadius:3 },
+      { label:'Decision Rework Rate (%)',     data:[14,13,11,10,9,8.5,8.2,8.0],               borderColor:'#f0a500', tension:.4, borderWidth:2, borderDash:[5,3], yAxisID:'y2', pointRadius:3 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ font:{size:11} } } }, scales:{
+      y:  { title:{display:true,text:'Coverage / Fidelity (%)'}, min:85, max:100, grid:{color:'#e8eef4'}, position:'left' },
+      y2: { title:{display:true,text:'Rework Rate (%)'}, min:0, max:20, grid:{display:false}, position:'right' },
+      x:  { grid:{display:false} }
+    }}
+  });
+}
+
+// ── FIBER MAP ──
+function buildFiberMap() {
+  const map = document.getElementById('fiber-map');
+  if (!map) return;
+  map.innerHTML = '<svg class="fiber-lines" id="fiber-svg"></svg>';
+  const nodes = [
+    { id:'mh',   label:'Medicine Hat G2',  type:'site', x:72, y:35 },
+    { id:'pc',   label:'Pincher Creek W1', type:'site', x:25, y:60 },
+    { id:'ts',   label:'Taber Solar E1',   type:'site', x:55, y:55 },
+    { id:'hub1', label:'Lethbridge Hub',   type:'hub',  x:40, y:40 },
+    { id:'pop1', label:'Calgary PoP',      type:'pop',  x:30, y:20 },
+    { id:'pop2', label:'Medicine Hat PoP', type:'pop',  x:65, y:25 },
+  ];
+  const lines = [
+    ['pop1','hub1','solid'],['hub1','pc','solid'],['hub1','ts','solid'],
+    ['pop2','mh','solid'],['hub1','pop2','dashed'],['pop1','pop2','solid'],
+  ];
+  const w = map.offsetWidth || 400;
+  const h = map.offsetHeight || 200;
+  const svg = document.getElementById('fiber-svg');
+  svg.innerHTML = lines.map(([a,b,style])=>{
+    const na = nodes.find(n=>n.id===a), nb = nodes.find(n=>n.id===b);
+    const x1=(na.x/100)*w, y1=(na.y/100)*h, x2=(nb.x/100)*w, y2=(nb.y/100)*h;
+    const dash = style==='dashed'?'stroke-dasharray="6 4"':'';
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,168,120,0.5)" stroke-width="1.5" ${dash}/>`;
+  }).join('');
+  nodes.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'map-node ' + n.type;
+    el.style.left = (n.x/100*w-7)+'px';
+    el.style.top  = (n.y/100*h-7)+'px';
+    el.title = n.label;
+    el.onmouseenter = function() {
+      let tt = document.querySelector('.map-tooltip');
+      if (!tt) { tt = document.createElement('div'); tt.className='map-tooltip'; map.appendChild(tt); }
+      tt.textContent = n.label; tt.style.display='block';
+      tt.style.left=(n.x/100*w+10)+'px'; tt.style.top=(n.y/100*h-10)+'px';
+    };
+    el.onmouseleave = function() { const tt=document.querySelector('.map-tooltip'); if(tt) tt.style.display='none'; };
+    map.appendChild(el);
+  });
+}
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  initDashboardCharts();
+  setTimeout(buildFiberMap, 100);
+});
+</script>
+</body>
+</html>
