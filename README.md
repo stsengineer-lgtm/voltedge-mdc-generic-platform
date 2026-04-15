@@ -2,100 +2,105 @@
 
 A single-page web application for AI-assisted planning of renewable energy micro data centre (MDC) sites in Alberta's power grid.
 
-## Overview
+## Project Structure
 
-VoltEdge MDC is an early-stage planning tool that helps investment, engineering, and commercial teams evaluate sites for co-located renewable energy + battery storage + compute (MDC) projects. The platform aggregates data from AESO grid feeds, SCADA exports, weather models, and regulatory document stores to produce AI-assisted decision packets — always with a human in the loop.
+```
+voltedge-mdc/
+├── index.html                        # Main HTML — view templates & layout
+├── css/
+│   └── styles.css                    # All styles, CSS variables, component classes
+├── js/
+│   ├── nav.js                        # Navigation, view switching, UI interactions
+│   ├── charts.js                     # All Chart.js chart definitions (lazy-init per view)
+│   └── fibermap.js                   # SVG fiber connectivity map renderer
+├── docs/
+│   ├── architecture.md               # Platform architecture reference
+│   └── metrics-and-monitoring.md     # Metrics & monitoring specification
+└── .github/
+    └── workflows/
+        └── deploy.yml                # GitHub Pages auto-deploy
+```
 
-## Platform Modules
+## Module Responsibilities
 
-| Module | Description |
+| File | Responsibility |
 |---|---|
-| **Dashboard** | Portfolio overview, live KPIs, data freshness, guardrail status |
-| **Site Screening** | Multi-factor scoring across curtailment, grid, network, and regulatory dimensions |
-| **Curtailment Intelligence** | Predictive AI forecasting at 10-minute resolution with confidence bands |
-| **Load & Storage Sizing** | Agentic optimization loop for BESS + MDC configuration scenarios |
-| **Grid Interaction Modeling** | Backup coverage simulation and scenario comparison |
-| **Network & Fiber Feasibility** | Latency scoring, provider assessment, connectivity map |
-| **Agentic Decision Support** | Human-in-the-loop recommendation review queue |
-| **Scenario Analysis** | Portfolio IRR comparison across base/downside/upside cases |
-| **Executive Narratives** | RAG-grounded site briefs and IC packages |
-| **Performance & Business Impact** | Model metrics, KPI alignment, evaluation methods |
-| **Deployment & Monitoring** | API architecture, governance gates, drift detection |
-| **Data Sources** | Data ingestion layer configuration and security controls |
-
-## Key Design Principles
-
-- **Human-in-the-Loop**: No autonomous dispatch, no AI-initiated regulatory filings. Every recommendation requires explicit human approval before any downstream action.
-- **Read-Only Data Integration**: The platform does not connect to live grid or SCADA control systems. It synthesizes outputs from existing tools.
-- **RAG-Grounded Narratives**: All regulatory claims cite approved sources. Outputs without citations are blocked from export.
-- **Confidence Transparency**: Every forecast includes confidence bands and data freshness indicators.
-- **Client Data Isolation**: Proprietary data is architecturally segmented per client/project.
+| `index.html` | Shell layout, sidebar, topbar, all view HTML templates. Scripts loaded at bottom in dependency order. |
+| `css/styles.css` | All visual styles. Uses CSS custom properties (`--teal`, `--navy`, etc.) for consistent theming. |
+| `js/nav.js` | `navigate(id)` — switches active view, updates topbar & sidebar. Also owns `toggleScenario()`, `approveDecision()`, and `updateSizingOutputs()`. |
+| `js/charts.js` | All Chart.js instances. `initChartsFor(view)` is called by `navigate()` — charts are lazy-initialised only when their view is first shown. Each chart is registered in `chartInstances{}` and destroyed before re-creation to prevent canvas reuse errors. |
+| `js/fibermap.js` | `buildFiberMap()` — renders the Southern Alberta fiber node/edge map as SVG lines + DOM node elements over a dark background container. Nodes and edges are defined as data arrays at the top of the file — easy to extend. |
 
 ## Technology
 
-- **Frontend**: Vanilla HTML/CSS/JavaScript — no build step required
+- **Frontend**: Vanilla HTML/CSS/JavaScript — no framework, no build step
 - **Charts**: [Chart.js 4.4.1](https://www.chartjs.org/) (CDN)
 - **Deployment**: Any static web host (GitHub Pages, Netlify, Vercel, S3)
 
 ## Getting Started
 
-### Local Development
+### Run Locally
 
 ```bash
-# Clone the repository
+# Clone
 git clone https://github.com/your-org/voltedge-mdc.git
 cd voltedge-mdc
 
-# Open directly in browser (no build step needed)
+# Option 1: Open directly
 open index.html
 
-# Or serve locally
+# Option 2: Serve locally (recommended — avoids any CORS quirks)
 python3 -m http.server 8080
-# Then visit http://localhost:8080
+# Visit http://localhost:8080
 ```
 
-### GitHub Pages Deployment
+### Deploy to GitHub Pages
 
 1. Push to a GitHub repository
-2. Go to **Settings → Pages**
-3. Set source to **Deploy from a branch** → `main` → `/ (root)`
-4. Visit `https://your-username.github.io/voltedge-mdc/`
+2. **Settings → Pages → Deploy from branch → `main` / `root`**
+3. Visit `https://your-username.github.io/voltedge-mdc/`
 
-## Repository Structure
+The included `.github/workflows/deploy.yml` can also auto-deploy on push if you switch Pages source to **GitHub Actions**.
 
+## Extending the App
+
+### Add a New View
+
+1. Add an `<div class="view" id="view-myview">` block in `index.html`
+2. Add a sidebar item: `<div class="sb-item" onclick="navigate('myview')">…</div>`
+3. Add the title to `VIEW_TITLES` in `js/nav.js`
+4. Add the view id to the `VIEWS` array in `js/nav.js`
+5. If the view has charts, add a case in `initChartsFor()` in `js/charts.js`
+
+### Add a New Chart
+
+In `js/charts.js`, add an `initXxxCharts()` function and reference it from `initChartsFor()`. Follow the existing pattern:
+```js
+function initMyCharts() {
+  destroyChart('my-canvas-id');
+  chartInstances['my-canvas-id'] = new Chart(
+    document.getElementById('my-canvas-id').getContext('2d'),
+    { /* Chart.js config */ }
+  );
+}
 ```
-voltedge-mdc/
-├── index.html              # Main application (self-contained)
-├── README.md               # This file
-├── docs/
-│   ├── architecture.md     # Platform architecture reference
-│   └── metrics-and-monitoring.md  # Metrics & monitoring specification
-└── .github/
-    └── workflows/
-        └── deploy.yml      # Optional: GitHub Pages auto-deploy
-```
+
+### Update Fiber Map Nodes or Edges
+
+Edit `FIBER_NODES` and `FIBER_EDGES` at the top of `js/fibermap.js`. Positions are percentages of the container dimensions (`x`, `y` from 0–100).
 
 ## Architecture Reference
 
-See [`docs/architecture.md`](docs/architecture.md) for:
-- Intelligence layer design
-- API contract design ("thin waist" pattern)
-- RAG architecture
-- Human-in-the-loop enforcement
+See [`docs/architecture.md`](docs/architecture.md) for the full platform architecture, API contract design, RAG architecture, and human-in-the-loop enforcement model.
 
 ## Metrics & Monitoring
 
-See [`docs/metrics-and-monitoring.md`](docs/metrics-and-monitoring.md) for:
-- Model metrics (curtailment forecast MAE/MAPE by horizon)
-- System metrics (Time-to-Decision)
-- Integration metrics (SCADA ingestion fidelity)
-- Evaluation methods
-- Review cadence schedules
+See [`docs/metrics-and-monitoring.md`](docs/metrics-and-monitoring.md) for model metrics, system metrics, evaluation methods, and review cadence schedules.
+
+---
 
 ## Disclaimer
 
-All data displayed in this platform is for planning and decision-support purposes only. AI-generated scores, forecasts, and narratives require human review and do not constitute engineering, legal, financial, or investment advice. All regulatory interpretations must be verified against current AESO rules and applicable regulations.
-
----
+All data displayed in this platform is for planning and decision-support purposes only. AI-generated scores, forecasts, and narratives require human review and do not constitute engineering, legal, financial, or investment advice.
 
 *VoltEdge MDC · AI Platform v1.2 · Alberta Grid*
